@@ -1,0 +1,815 @@
+# SD INFINOVA — COMPLETE FULL-STACK WEBSITE REBUILD
+
+## 1. ROLE AND OBJECTIVE
+
+Act as a senior full-stack engineer, creative director, UI/UX designer, SEO specialist, database architect, security engineer, and conversion-rate optimization expert.
+
+Rebuild my existing brand website, **SD Infinova**, entirely from scratch as a production-ready digital studio and web engineering platform.
+
+Brand positioning: **Digital Studio & Web Engineering**
+
+Business location: Nepal  
+Primary market: Small and medium-sized businesses in Nepal  
+Secondary market: International clients  
+Primary objective: Generate qualified leads, convert visitors into paying clients, establish brand credibility, and allow the owner to manage website content through a secure admin panel.
+
+This is a real business website, not a template, mockup, or static frontend demonstration.
+
+I will provide the official SD Infinova logo. Use the supplied logo as the source of truth for brand identity. Preserve its proportions, visual characteristics, and recognizable identity. Do not generate a replacement logo.
+
+Build the complete working application, including frontend, backend, database, authentication, CMS, admin dashboard, SEO, analytics, testing, and deployment configuration.
+
+Do not stop after creating the homepage or a UI prototype.
+
+---
+
+## 2. BRAND IDENTITY AND DESIGN SYSTEM
+
+Use the existing SD Infinova brand identity.
+
+Visual direction:
+- Premium dark digital studio aesthetic.
+- Deep charcoal, near-black, and dark graphite backgrounds.
+- Bronze, champagne gold, or muted metallic gold accents matching the supplied logo.
+- White and soft gray typography with accessible contrast.
+- Refined borders, subtle gradients, controlled glow effects, and elegant shadows.
+- Modern editorial layouts with generous whitespace.
+- Sophisticated typography and consistent spacing.
+- Professional visual hierarchy rather than excessive decoration.
+
+Before implementing colors, inspect the provided logo and determine its dominant background, accent, and neutral colors. Extract approximate brand colors and centralize them in CSS variables or design tokens.
+
+Create a coherent design system covering:
+- Primary and secondary colors.
+- Background and surface colors.
+- Typography scale.
+- Spacing and container widths.
+- Border radius and shadows.
+- Buttons, links, forms, cards, and navigation.
+- Focus, hover, active, loading, success, and error states.
+
+The website should feel like a custom-built digital engineering studio, not a generic AI-generated agency template.
+
+Avoid:
+- Purple-and-blue AI gradients.
+- Fake terminal animations and unnecessary code rain.
+- Excessive glassmorphism.
+- Constantly moving backgrounds.
+- Generic stock photos of people working on laptops.
+- Random floating icons and decorative elements without purpose.
+- Excessive rounded cards on every section.
+- Fake client logos, fake testimonials, invented awards, and fabricated statistics.
+- Animations that delay access to important content.
+
+Use authentic project screenshots, supplied brand assets, and real portfolio links wherever available.
+
+The official logo will be provided separately. Keep it configurable in the shared layout and admin settings.
+
+---
+
+## 3. FRONTEND TECHNOLOGY
+
+Preferred stack:
+- React.
+- TypeScript with strict type checking.
+- Vite.
+- Tailwind CSS or a well-structured CSS architecture with reusable design tokens.
+- React Router for client-side routing where appropriate.
+- Framer Motion or Motion for purposeful transitions.
+- Lucide icons.
+- Three.js or React Three Fiber only where it materially improves the experience.
+
+Use current, mutually compatible stable package versions. Do not blindly install incompatible versions or use unnecessary libraries.
+
+The project must have a maintainable folder structure, reusable components, centralized API handling, environment-based configuration, error boundaries, and consistent naming.
+
+Use semantic HTML, accessible interactions, responsive images, lazy loading, and responsive layouts.
+
+### Responsive requirements
+
+Support:
+- Small mobile phones.
+- Large mobile phones.
+- Tablets.
+- Laptops.
+- Desktop monitors.
+- Wide screens.
+
+Test layouts at approximately 360px, 390px, 768px, 1024px, 1440px, and 1920px.
+
+The mobile navigation, contact actions, forms, project cards, and admin tables must work properly on touch devices.
+
+---
+
+## 4. WEBSITE INFORMATION ARCHITECTURE
+
+Create a cohesive website with the following pages.
+
+### A. Home page
+
+Build a distinctive, high-converting landing page.
+
+Hero section:
+- Official SD Infinova logo and navigation.
+- Brand headline establishing SD Infinova as a digital studio and web engineering partner.
+- Concise description focused on building useful, modern digital experiences for businesses.
+- Primary CTA: Discuss Your Project.
+- Secondary CTA: Explore Our Work.
+- A restrained, premium visual treatment using the real brand colors.
+- Optional interactive 3D scene if it improves the brand experience without harming performance.
+
+Suggested headline direction:
+
+"Digital Experiences Built to Move Businesses Forward."
+
+Treat this as a starting point. Develop the final copy to fit the actual services and audience.
+
+Below the hero, include:
+1. Selected projects.
+2. Services overview.
+3. Why work with SD Infinova.
+4. Our process.
+5. Industries served.
+6. Technologies and capabilities.
+7. Selected results or case studies when verified data exists.
+8. FAQ section.
+9. Strong project inquiry CTA.
+10. Professional footer.
+
+Do not invent metrics or claim business outcomes without evidence.
+
+### B. Services page
+
+Create individual service sections or dedicated SEO-friendly service pages for:
+
+- Website Design and Development.
+- Business Websites and Landing Pages.
+- Website Redesign and UI/UX Improvements.
+- Website Maintenance and Technical Support.
+- Custom Web Applications and Dashboards.
+- Backend API Development and Database Integration.
+- Business Automation and Custom Digital Solutions.
+- Technical SEO and Website Performance Optimization.
+
+Only publish services that the business genuinely intends to offer.
+
+Every service page should include:
+- Clear value proposition.
+- Problems solved.
+- Deliverables.
+- Typical workflow.
+- Relevant project examples where available.
+- Frequently asked questions.
+- Project inquiry CTA.
+- Unique page title, meta description, canonical URL, and structured data where appropriate.
+
+### C. Portfolio and case studies
+
+Create a filterable portfolio with categories such as:
+- Business websites.
+- Healthcare.
+- Photography.
+- E-commerce.
+- Custom applications.
+- Experimental projects.
+
+Use real projects where available:
+- SD Tech Photograph.
+- Dental Care.
+- Clothing website.
+- FindMyHostel.
+- Other projects that are publicly available and approved for display.
+
+Treat each as a configurable project record. Verify its live URL, screenshots, technology stack, and current completion status before publishing.
+
+Each project should support:
+- Title.
+- Slug.
+- Short description.
+- Full case study.
+- Project category.
+- Cover image.
+- Gallery images.
+- Technologies used.
+- Live demo URL.
+- Repository URL when public and appropriate.
+- Project status.
+- Featured toggle.
+- SEO title and description.
+- Draft or published state.
+
+Do not expose private repositories, credentials, internal APIs, or client data.
+
+Create reusable project detail pages with measurable results only when verified.
+
+### D. About page
+
+Explain the studio's engineering-first approach, design philosophy, working process, and commitment to practical digital solutions.
+
+Use a credible founder-led studio tone. Do not fabricate a team, company history, client list, office, or credentials.
+
+### E. Contact and project inquiry
+
+Build a polished project inquiry experience.
+
+Fields:
+- Name.
+- Business or organization.
+- Email.
+- Phone or WhatsApp, optional.
+- Business location or country.
+- Project type.
+- Budget range.
+- Expected timeline.
+- Project description.
+- Preferred contact method.
+
+Support Nepal-friendly budget options, including NPR 5,000–15,000, NPR 15,000–35,000, NPR 35,000–75,000, NPR 75,000+, and a custom or undecided option. Keep the options editable through admin settings.
+
+Clearly explain that final pricing depends on scope, features, integrations, content, and hosting requirements.
+
+Include:
+- Client-side and server-side validation.
+- Spam and abuse protection.
+- Rate limiting.
+- Accessible success and error messages.
+- Server-side persistence of legitimate submissions.
+- Admin notifications through a configurable email integration.
+- Optional WhatsApp contact link using a verified business number.
+- Privacy notice and appropriate consent.
+
+Never display a fake successful submission when the server request fails.
+
+### F. Blog and insights
+
+Create an SEO-friendly publishing system for useful business and technology articles.
+
+Content topics can include:
+- Why Nepalese businesses need professional websites.
+- Website design costs in Nepal.
+- Website maintenance and security.
+- Local SEO for small businesses.
+- Website speed and conversion optimization.
+- Practical digital transformation for small businesses.
+
+Each article needs:
+- Title and unique slug.
+- Excerpt.
+- Rich-text or Markdown content with safe rendering.
+- Author.
+- Cover image and alternative text.
+- Category and tags.
+- Published and updated timestamps.
+- Draft, published, and scheduled states.
+- SEO title and description.
+- Canonical URL.
+- Open Graph metadata.
+- Related posts.
+- Reading time calculated from content.
+
+Do not publish placeholder articles as genuine content.
+
+### G. Additional pages
+
+Create:
+- FAQ.
+- Privacy Policy.
+- Terms of Service.
+- Custom 404 page.
+- Custom error and maintenance states.
+
+Legal content must be editable and must not claim compliance with laws or certifications that have not been verified.
+
+---
+
+## 5. NAVIGATION AND INTERACTION DESIGN
+
+Create a premium, responsive navigation system.
+
+Desktop:
+- Logo on the left.
+- Main navigation in the center or balanced alongside the logo.
+- Distinct project inquiry CTA.
+- Restrained scroll-state changes.
+
+Mobile:
+- Accessible menu toggle.
+- Proper focus management.
+- No overflow.
+- Touch-friendly links and buttons.
+- Clear contact action.
+
+Implement:
+- Smooth anchor scrolling.
+- Scroll-triggered reveals with reduced-motion support.
+- Subtle card interactions.
+- Purposeful transitions.
+- Clear form feedback.
+- Keyboard-accessible menus and dialogs.
+- Persistent visual consistency across pages.
+
+Avoid using animations to compensate for weak content or poor layout.
+
+### Optional Three.js experience
+
+If a 3D scene is used, keep it brand-relevant and lightweight.
+
+Requirements:
+- Provide a static fallback.
+- Respect prefers-reduced-motion.
+- Pause rendering when the scene is not visible or the tab is inactive where practical.
+- Lazy-load the 3D module.
+- Avoid blocking the first meaningful content.
+- Support mobile devices.
+- Never make 3D essential for navigation or understanding the service.
+
+---
+
+## 6. FULL-STACK BACKEND
+
+Build a real backend rather than relying on browser-only state or hardcoded mock data.
+
+Preferred architecture:
+- React + TypeScript + Vite frontend.
+- Node.js + TypeScript + Express backend.
+- PostgreSQL database.
+- Prisma ORM and version-controlled migrations.
+- REST API under `/api/v1`.
+- Zod or an equivalent schema validation library.
+- Centralized error handling and request validation.
+- Structured logging.
+- Environment-based configuration.
+
+Choose a single coherent architecture. Do not mix multiple backend approaches without a clear reason.
+
+The backend must support:
+- Public website content.
+- Services and portfolio.
+- Blog and SEO metadata.
+- Contact inquiries.
+- Admin authentication.
+- CMS operations.
+- Analytics.
+- Media management.
+- Site settings.
+- Admin audit history.
+
+Build database migrations, a safe seed script, and documented setup instructions.
+
+Do not silently substitute SQLite, in-memory arrays, localStorage, or mock APIs for the production PostgreSQL architecture.
+
+### Database models
+
+Design normalized, relational models for:
+- AdminUser.
+- AdminSession or equivalent secure session records.
+- Service.
+- Project.
+- ProjectImage.
+- BlogPost.
+- BlogCategory.
+- Tag.
+- PostTag.
+- ContactInquiry.
+- MediaAsset.
+- SiteSetting.
+- PageView or privacy-conscious analytics events.
+- AdminActivityLog.
+- RedirectRule where useful.
+
+Add appropriate:
+- Primary and foreign keys.
+- Unique constraints.
+- Indexes.
+- Created and updated timestamps.
+- Referential integrity.
+- Pagination-friendly fields.
+- Publication and visibility states.
+
+Use migrations rather than manual database changes that are missing from version control.
+
+---
+
+## 7. SECURE ADMIN PANEL
+
+Create a dedicated admin interface at `/admin`.
+
+The admin panel is a core product feature, not a visual mockup.
+
+### Authentication
+
+Implement:
+- Secure admin login.
+- Logout.
+- Secure session handling.
+- Password hashing with Argon2id or appropriately configured bcrypt.
+- HTTP-only, secure-in-production, SameSite cookies where using cookie sessions.
+- CSRF protection where applicable.
+- Login rate limiting.
+- Session expiry and invalidation.
+- Server-side authorization.
+- Environment-configured initial administrator creation.
+- Password change and recovery workflow.
+- Generic authentication error messages that do not reveal sensitive details.
+
+Never hardcode admin credentials, expose password hashes, or place secrets in frontend environment variables.
+
+Do not allow public registration as an administrator.
+
+The first administrator should be created through a documented setup command or protected deployment process. Never ship a default password.
+
+### Admin dashboard
+
+Create a professional dark dashboard that shares the brand identity but prioritizes usability over decorative effects.
+
+Dashboard overview:
+- Total page views.
+- Unique visitor estimates where privacy-conscious measurement is implemented.
+- Top pages.
+- Traffic trends.
+- Published projects.
+- Published blog posts.
+- New inquiries.
+- Recent admin activities.
+
+Every metric must come from real database records or explicitly configured analytics integrations. Show an honest empty state when data is unavailable.
+
+### Content management
+
+Administrators must be able to:
+
+1. Create, edit, publish, unpublish, and delete projects.
+2. Manage project galleries and featured projects.
+3. Create, edit, preview, schedule, publish, and archive blog posts.
+4. Manage services and their display order.
+5. Edit FAQ entries.
+6. Manage SEO titles, descriptions, canonical URLs, social images, and indexing settings.
+7. Upload, browse, replace, and delete media assets.
+8. Edit homepage content and site-wide calls to action.
+9. Manage contact inquiries and their statuses.
+10. Configure contact information, social links, business details, and site metadata.
+11. Inspect page-view analytics.
+12. Review admin activity logs.
+13. Manage redirects when URLs change.
+14. Preview draft content before publication.
+
+Use real CRUD APIs and persist all changes in PostgreSQL.
+
+Add loading states, form validation, success/error feedback, pagination, filters, search, confirmation dialogs for destructive actions, and useful empty states.
+
+Protect all administrative APIs independently of the frontend. Hiding a button is not authorization.
+
+### Contact inquiry management
+
+Create an admin inbox with:
+- Submission date.
+- Contact details.
+- Project type.
+- Budget.
+- Message.
+- Status: New, Contacted, Qualified, Won, Lost, or Archived.
+- Internal notes.
+- Search and filtering.
+- Status updates.
+- Export to CSV with appropriate access control.
+
+Prevent accidental duplicate submissions and protect against abuse.
+
+### Media library
+
+Implement:
+- Secure upload validation.
+- Allowed MIME types and file extensions.
+- File size limits.
+- Randomized storage filenames.
+- Safe image handling.
+- Descriptive alt text.
+- Media metadata.
+- Storage abstraction.
+
+Do not accept arbitrary executable uploads.
+
+Use local storage for development only. For production, support object storage or another persistent storage provider. Do not assume the hosting platform's filesystem is persistent.
+
+### Site settings
+
+Allow administrators to configure:
+- Brand logo and favicon.
+- Contact email and phone.
+- WhatsApp number.
+- Social links.
+- Business location.
+- Footer content.
+- Global SEO defaults.
+- Analytics settings.
+- Announcement bar.
+- Contact form configuration.
+
+Sensitive configuration such as database URLs, API keys, SMTP passwords, and authentication secrets must remain in environment variables or a secret manager, never in ordinary CMS settings.
+
+---
+
+## 8. TECHNICAL SEO — IMPLEMENT PROPERLY
+
+SEO must be implemented in the application, not simply documented.
+
+### Crawlability and indexing
+
+Implement:
+- Unique document titles.
+- Unique meta descriptions.
+- Canonical URLs.
+- XML sitemap generated from published pages.
+- robots.txt.
+- Correct HTTP status codes.
+- Custom 404 responses.
+- Redirect management.
+- Clean, descriptive slugs.
+- Correct internal links.
+- Crawlable navigation.
+- Indexable published content.
+- Noindex protection for admin, login, private previews, and other private routes.
+
+Draft content must not leak into public sitemap entries or indexable public APIs.
+
+Ensure search engines can access the actual content. Do not assume a Vite single-page application automatically delivers optimal SEO.
+
+Use a suitable rendering strategy for public pages. If necessary, implement server-side rendering or prerendering for important public content and dynamic metadata. Make the chosen architecture compatible with the actual deployment target.
+
+### Structured data
+
+Implement appropriate JSON-LD using Schema.org where supported:
+- Organization.
+- WebSite.
+- Service.
+- BreadcrumbList.
+- Article or BlogPosting.
+- FAQPage only where the page and current search-engine guidelines justify it.
+
+Use verified organization details only. Do not fabricate aggregate ratings, reviews, prices, awards, or addresses.
+
+### Nepal-focused SEO
+
+Build a strategy targeting relevant intent, including:
+- Web development company in Nepal.
+- Website design in Nepal.
+- Website development in Kathmandu.
+- Business website development for Nepalese companies.
+- Custom web application development.
+- Website redesign and maintenance.
+- Local SEO services where actually offered.
+
+Use these phrases naturally, based on real services and appropriate search intent. Do not stuff keywords or generate dozens of near-identical doorway pages.
+
+Support location-specific landing pages only where the business has a legitimate offering and useful, distinct content.
+
+Keep English as the initial primary language. Structure content and routing so Nepali-language content can be added later without redesigning the entire system.
+
+### International SEO
+
+- Use consistent canonical URLs.
+- Configure Open Graph and social sharing metadata.
+- Use absolute URLs for sitemap and canonical links.
+- Keep locale and language metadata accurate.
+- Add hreflang only when genuine language or regional alternatives exist.
+- Support custom metadata for individual projects and articles.
+
+### Performance and Core Web Vitals
+
+Target strong mobile performance and Core Web Vitals.
+
+Optimize:
+- Largest Contentful Paint.
+- Interaction to Next Paint.
+- Cumulative Layout Shift.
+- JavaScript bundle size.
+- Font loading.
+- Image sizes and formats.
+- Caching and compression.
+- Unused CSS and dependencies.
+- Third-party scripts.
+- API response times.
+
+Use responsive images, WebP/AVIF where suitable, lazy loading below the fold, and explicit image dimensions.
+
+Do not lazy-load the primary above-the-fold hero image if doing so harms LCP.
+
+Treat Lighthouse scores as diagnostics, not proof of SEO rankings.
+
+### SEO admin tools
+
+Allow editing:
+- Page title.
+- Meta description.
+- Slug.
+- Canonical URL.
+- Social sharing title and image.
+- Index/follow directives.
+- Structured data fields where safely supported.
+
+Provide useful warnings for missing metadata, duplicate slugs, empty alt text, missing canonical URLs, and broken internal links where detectable.
+
+---
+
+## 9. ANALYTICS AND PRIVACY
+
+Build first-party analytics for:
+- Page views.
+- Landing pages.
+- Referrer categories where available.
+- Daily and monthly traffic.
+- Most visited pages.
+- Contact form conversions.
+- Project inquiry sources where appropriately collected.
+
+Do not fabricate visitor counts or conversion rates.
+
+Avoid collecting unnecessary personal data, fingerprinting users, or storing raw sensitive information in analytics events.
+
+Implement appropriate retention controls and a privacy notice. If external analytics or advertising services are enabled, configure the consent and disclosure requirements applicable to the actual implementation and jurisdiction.
+
+Ensure admin routes and sensitive form content are excluded from page-view tracking.
+
+---
+
+## 10. SECURITY REQUIREMENTS
+
+Implement a practical production security baseline:
+- Secure password hashing.
+- Strict server-side authorization.
+- Input validation and output encoding.
+- SQL injection protection through safe ORM usage.
+- XSS protection.
+- CSRF protection where relevant.
+- Rate limiting.
+- Secure cookies.
+- Appropriate CORS configuration.
+- Security headers.
+- Content Security Policy compatible with the application.
+- Upload restrictions.
+- Request size limits.
+- Safe error responses.
+- Secret management.
+- Dependency auditing.
+- Audit logging for sensitive admin actions.
+- Backups and database recovery guidance.
+
+Do not log passwords, tokens, session identifiers, or full sensitive inquiry contents.
+
+Do not expose database credentials, secrets, stack traces, or private admin data through public endpoints.
+
+Do not rely on CORS alone to protect APIs.
+
+Document the remaining operational responsibilities, including TLS, secret rotation, backups, patching, and recovery.
+
+---
+
+## 11. PERFORMANCE, ACCESSIBILITY, AND QUALITY
+
+Follow WCAG 2.2 AA accessibility principles where practical.
+
+Requirements:
+- Semantic page structure.
+- Keyboard navigation.
+- Visible focus states.
+- Appropriate contrast.
+- Accessible form labels.
+- Screen-reader-friendly validation.
+- Reduced-motion support.
+- Alt text for meaningful images.
+- Accessible dialog and menu behavior.
+
+Optimize for real users on mobile networks in Nepal.
+
+Do not force unnecessary video backgrounds or 3D rendering on lower-powered devices.
+
+Avoid excessive dependencies and oversized client bundles.
+
+Create reusable loading skeletons only where useful, plus proper error, empty, offline, and retry states.
+
+---
+
+## 12. TESTING REQUIREMENTS
+
+Write meaningful automated tests.
+
+Backend:
+- Authentication and authorization.
+- Public read APIs.
+- Protected CRUD endpoints.
+- Form validation.
+- Contact inquiry creation.
+- Media upload validation.
+- Pagination and filtering.
+- SEO metadata and sitemap generation.
+
+Frontend:
+- Navigation.
+- Contact forms.
+- Admin login.
+- CMS editing flows.
+- Responsive layouts.
+- Error and empty states.
+
+End-to-end:
+- Admin login.
+- Create and publish a project.
+- Verify it appears on the public site.
+- Create and publish a blog post.
+- Submit a contact inquiry.
+- Update its status from admin.
+- Confirm unauthorized requests are rejected.
+
+Add linting, type checking, and production build validation.
+
+Fix actual test failures rather than suppressing errors or weakening assertions.
+
+---
+
+## 13. DEPLOYMENT ARCHITECTURE
+
+Plan deployment around a compatible production setup.
+
+Preferred separation:
+- Frontend: Cloudflare Pages or another appropriate static/SSR-capable hosting platform.
+- Backend: a persistent Node.js hosting platform.
+- Database: managed PostgreSQL.
+- Media: persistent object storage.
+
+If Cloudflare is used, verify whether the selected frontend framework and backend runtime are supported by the actual Cloudflare product. Do not assume a standard Express server can run unchanged as a Cloudflare Pages Function.
+
+Provide:
+- Development environment setup.
+- Production environment variables.
+- Database migration commands.
+- Safe administrator bootstrap command.
+- Build and start commands.
+- Deployment configuration.
+- Health-check endpoint.
+- Database backup and restore procedure.
+- Persistent media configuration.
+- Production CORS and cookie configuration.
+- Custom domain and HTTPS instructions.
+- Rollback guidance.
+
+Do not put secrets in GitHub or frontend-exposed Vite variables.
+
+Keep `.env` files out of version control and provide a `.env.example` with placeholder values only.
+
+Document which components incur hosting, database, email, or storage costs. Prefer a cost-conscious deployment suitable for a small Nepal-based studio.
+
+---
+
+## 14. IMPLEMENTATION WORKFLOW
+
+Work in the following order.
+
+Phase 1: Audit the supplied logo and define the design system, site architecture, and deployment architecture.
+
+Phase 2: Set up the project, dependencies, shared layouts, routing, responsive design, and reusable components.
+
+Phase 3: Implement the public pages with real content structure and portfolio integration.
+
+Phase 4: Implement PostgreSQL, Prisma schema, migrations, seed data, backend APIs, and validation.
+
+Phase 5: Implement authentication, protected admin APIs, admin dashboard, CMS, media library, and inquiry management.
+
+Phase 6: Implement SEO, structured data, sitemap, redirects, analytics, security, and performance optimization.
+
+Phase 7: Write and execute tests. Run linting, type checking, migrations, and production builds.
+
+Phase 8: Prepare deployment configuration and document the exact steps required to launch.
+
+At every phase, verify that the application runs. Do not leave broken imports, placeholder API calls, missing packages, or unresolved TypeScript errors.
+
+Use existing working components or project content only when they genuinely improve the new architecture. Do not preserve old technical debt just for the sake of reuse.
+
+Before installing a package, inspect existing dependencies and choose compatible versions. Avoid unnecessary framework changes and dependency conflicts.
+
+Do not claim that a feature is complete until its actual implementation and tests support that claim.
+
+---
+
+## 15. DEFINITION OF DONE
+
+The project is complete only when:
+
+- The public website is responsive and visually consistent with the supplied brand.
+- Every public navigation link works.
+- Portfolio projects and blog posts load from the real backend.
+- Admin login works securely.
+- Unauthorized visitors cannot access protected administrative operations.
+- Admin CRUD changes persist in PostgreSQL.
+- Published content appears publicly and draft content remains private.
+- Contact inquiries are saved and manageable.
+- Media uploads use safe, persistent storage in production.
+- SEO metadata, sitemap, robots.txt, canonical URLs, and structured data work correctly.
+- Analytics displays real available data and honest empty states.
+- Accessibility and mobile behavior have been tested.
+- Automated tests, type checks, and production builds pass.
+- Environment variables and deployment instructions are documented.
+- No fake metrics, fabricated testimonials, hardcoded production credentials, or nonfunctional buttons remain.
+
+Start by inspecting the provided logo and defining the design system and architecture. Then implement the actual application. Do not stop at a plan, wireframe, or attractive frontend mockup.
+
+**Final priority:** Build a distinctive, trustworthy, fast, secure, SEO-ready digital studio website that can generate real business inquiries and be operated through its own admin dashboard without manually editing source code for routine content updates.

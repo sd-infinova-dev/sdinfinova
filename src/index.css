@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    
+    --brand-bg: #090a0c;
+    --brand-card: #111317;
+    --brand-surface: #171920;
+    --brand-border: rgba(255, 255, 255, 0.08);
+    --brand-gold: #d89f66;
+    --brand-gold-hover: #e5b380;
+    --brand-gold-muted: rgba(216, 159, 102, 0.15);
+    --brand-cyan: #3a86c8;
+    --brand-cyan-muted: rgba(58, 134, 200, 0.15);
+    --text-primary: #f3f4f6;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--brand-bg);
+    color: var(--text-primary);
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
+  }
+
+  code, pre, .tabular-nums, .font-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #090a0c;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1f232c;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2f3644;
+}
+
+/* Smooth gradient transitions */
+.gold-gradient-text {
+  background: linear-gradient(135deg, #f5d3b3 0%, #d89f66 50%, #b87e45 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dual-gradient-text {
+  background: linear-gradient(135deg, #d89f66 0%, #3a86c8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-glow {
+  box-shadow: 0 0 35px -8px rgba(216, 159, 102, 0.25);
+}
+
+.subtle-border {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.surface-card {
+  background: #111317;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.surface-card:hover {
+  border-color: rgba(216, 159, 102, 0.25);
+}

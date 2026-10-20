@@ -1,0 +1,6 @@
+{
+  "name": "SD Infinova — Digital Studio & Web Engineering",
+  "description": "Official production website and CMS for SD Infinova, a premier digital studio and web engineering partner based in Nepal delivering high-impact web applications, bespoke business websites, and technical optimization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
