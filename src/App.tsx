@@ -206,6 +206,7 @@ export default function App() {
             }
             loadPublicData(); // Reload content in case admin updated anything
           }}
+          onDataChanged={loadPublicData}
         />
       )}
 

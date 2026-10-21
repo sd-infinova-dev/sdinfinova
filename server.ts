@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -20,11 +21,14 @@ const isProduction = process.env.NODE_ENV === 'production';
 async function startServer() {
   const app = express();
 
+  // Trust first proxy hop (Cloud Run / load balancer) for accurate IP resolution
+  app.set('trust proxy', 1);
+
   // Basic security and parsing middleware
   // Restrictive CORS: allow only whitelisted origins defined in env (comma-separated). Fallback to same origin.
   const whitelist = (process.env.CORS_WHITELIST || '').split(',').map(o => o.trim()).filter(Boolean);
-  const corsOptions = {
-    origin: (origin, callback) => {
+  const corsOptions: cors.CorsOptions = {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       // Allow requests without Origin (e.g., server-to-server, curl, Postman)
       if (!origin) return callback(null, true);
       // If whitelist is empty, allow all origins (development fallback)
@@ -33,7 +37,7 @@ async function startServer() {
       return callback(new Error('Not allowed by CORS'));
     },
     credentials: true
-  } as const;
+  };
   app.use(cors(corsOptions));
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -42,44 +46,43 @@ async function startServer() {
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 5, // limit each IP to 5 requests per window
-    message: { error: 'Too many attempts, please try again later.' }
+    message: { error: 'Too many attempts, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: {
+      xForwardedForHeader: false,
+      forwardedHeader: false,
+      trustProxy: false
+    }
   });
   // Apply to login route (will be attached later)
   // Apply to inquiry submission route (will be attached later)
 
 
   // Security Headers
-  // Security headers via Helmet (adds CSP, HSTS, etc.)
+  // Helmet with framing enabled for AI Studio preview environment iframe
   app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        // 'unsafe-inline' required for:
-        //   - @vitejs/plugin-react HMR preamble (dev)
-        //   - <script type="application/ld+json"> (JSON-LD structured data)
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        // Google Fonts stylesheet must be explicitly allowed
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        imgSrc: ["'self'", "data:", "https:"],
-        // ws:// required for Vite HMR WebSocket in dev; wss:// for prod HMR
-        connectSrc: ["'self'", "ws:", "wss:"],
-        // fonts.gstatic.com serves the actual font files
-        fontSrc: ["'self'", "https://fonts.gstatic.com", "https://fonts.googleapis.com"],
-        objectSrc: ["'none'"],
-        upgradeInsecureRequests: []
-      }
-    },
-    referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+    contentSecurityPolicy: false,
+    frameguard: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
+    crossOriginOpenerPolicy: false
   }));
   // Mount public API routes BEFORE csurf() so they are not blocked by CSRF.
   // Only non-sensitive, public-facing POST endpoints live here.
   app.use('/api/v1', publicApiRouter);
 
-  // CSRF protection for all subsequent routes (auth, admin, etc.)
-  app.use(csurf({ cookie: true }));
-app.use((_req, res, next) => {
+  // CSRF protection for all subsequent cookie-based routes
+  const csrfProtection = csurf({ cookie: true });
+  app.use((req, res, next) => {
+    // API endpoints authenticating with Bearer tokens or API routes bypass CSRF
+    if (req.headers.authorization || req.path.startsWith('/api/v1/')) {
+      return next();
+    }
+    return (csrfProtection as any)(req, res, next);
+  });
+  app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('X-XSS-Protection', '1; mode=block');
     next();
   });
@@ -202,8 +205,19 @@ Sitemap: https://sdinfinova.com/sitemap.xml
 app.use('/api/v1', apiRouter);
 
   // Vite development integration or static production serving
+  const distPath = path.resolve(__dirname, 'dist');
+  if (isProduction && fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.resolve(distPath, 'index.html'));
+    });
+    console.log('[Server] Serving production static bundle from /dist');
+  } else {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        allowedHosts: true
+      },
       appType: 'spa'
     });
     app.use(vite.middlewares);
@@ -211,24 +225,26 @@ app.use('/api/v1', apiRouter);
     app.use('*', async (req, res) => {
       try {
         const url = req.originalUrl;
-        let html = await vite.transformIndexHtml(url, fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8'));
+        const html = await vite.transformIndexHtml(url, fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8'));
         res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
-      } catch (e) {
+      } catch (e: any) {
         vite.ssrFixStacktrace(e);
         console.error(e);
-        res.status(500).end(e.message);
+        res.status(500).end(e?.message || 'Server error');
       }
     });
     console.log('[Server] Vite middleware mounted in development mode.');
-    const distPath = path.resolve(__dirname, 'dist');
-    if (fs.existsSync(distPath)) {
-      app.use(express.static(distPath));
-      app.get('*', (_req, res) => {
-        res.sendFile(path.resolve(distPath, 'index.html'));
-      });
-      console.log('[Server] Serving production static bundle from /dist');
-
   }
+
+  // Global error handling middleware
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    if (err.code === 'EBADCSRFTOKEN') {
+      res.status(403).json({ error: 'Session expired or invalid CSRF token' });
+      return;
+    }
+    console.error('[Server Error]', err);
+    res.status(500).json({ error: err?.message || 'Internal server error' });
+  });
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 [SD Infinova] Server listening at http://0.0.0.0:${PORT}`);

@@ -158,34 +158,6 @@ apiRouter.get('/projects', async (req, res) => {
       query += ` AND is_featured = true`;
     }
 
-    // Ensure legacy paths are updated to authentic namespaced assets and verified live URLs
-    await pg.exec(`
-      UPDATE projects SET 
-        live_url = 'https://sd-tech-photograph-ytpn.vercel.app/',
-        repo_url = NULL,
-        cover_image = '/assets/projects/sd-tech-photograph.png'
-      WHERE slug = 'sd-tech-photograph' OR id = 'prj_1';
-
-      UPDATE projects SET 
-        live_url = 'https://dental-rust-two.vercel.app/',
-        repo_url = NULL,
-        cover_image = '/assets/projects/dental-care.png'
-      WHERE slug = 'dental-care-clinic-portal' OR id = 'prj_2';
-
-      UPDATE projects SET 
-        title = 'SD Infininov - Dashain Reloaded Festive Clothing',
-        live_url = 'https://sd-infininova.vercel.app/',
-        repo_url = NULL,
-        cover_image = '/assets/projects/clothing-brand.png'
-      WHERE slug = 'nepal-apparel-clothing-store' OR id = 'prj_3';
-
-      UPDATE projects SET 
-        live_url = 'https://findmyhostel.pythonanywhere.com/',
-        repo_url = NULL,
-        cover_image = '/assets/projects/findmyhostel.png'
-      WHERE slug = 'find-my-hostel-nepal' OR id = 'prj_4';
-    `);
-
     query += ' ORDER BY created_at DESC';
     const result = await pg.query(query, params);
 
@@ -752,9 +724,9 @@ apiRouter.post('/admin/projects', requireAdmin, async (req, res) => {
         p.cover_image || '/assets/projects/sd-tech-photograph.png',
         JSON.stringify(p.gallery_images || []),
         JSON.stringify(p.tech_stack || ['React', 'TypeScript', 'Tailwind CSS']),
-        p.live_url || '',
-        p.repo_url || '',
-        p.client_name || '',
+        p.live_url && String(p.live_url).trim() ? String(p.live_url).trim() : null,
+        p.repo_url && String(p.repo_url).trim() ? String(p.repo_url).trim() : null,
+        p.client_name && String(p.client_name).trim() ? String(p.client_name).trim() : null,
         p.completion_date || '2026',
         p.is_featured === true,
         p.is_published !== false,
@@ -776,6 +748,46 @@ apiRouter.put('/admin/projects/:id', requireAdmin, async (req, res) => {
     const admin = (req as any).adminUser;
     const p = req.body;
 
+    const existingRes = await pg.query('SELECT * FROM projects WHERE id = $1', [id]);
+    if (existingRes.rows.length === 0) {
+      res.status(404).json({ error: 'Project not found.' });
+      return;
+    }
+    const existing = existingRes.rows[0] as any;
+
+    const slug = (p.slug && String(p.slug).trim()) || existing.slug || (p.title && String(p.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')) || id;
+    const title = p.title !== undefined ? String(p.title) : existing.title;
+    const category = p.category !== undefined ? String(p.category) : existing.category;
+    const short_description = p.short_description !== undefined ? String(p.short_description) : existing.short_description;
+    const full_case_study = p.full_case_study !== undefined ? String(p.full_case_study) : existing.full_case_study;
+    const cover_image = p.cover_image !== undefined ? String(p.cover_image) : existing.cover_image;
+    
+    // Parse arrays safely
+    const gallery_images = Array.isArray(p.gallery_images) 
+      ? JSON.stringify(p.gallery_images) 
+      : (typeof p.gallery_images === 'string' ? p.gallery_images : (typeof existing.gallery_images === 'string' ? existing.gallery_images : JSON.stringify(existing.gallery_images || [])));
+      
+    const tech_stack = Array.isArray(p.tech_stack) 
+      ? JSON.stringify(p.tech_stack) 
+      : (typeof p.tech_stack === 'string' ? JSON.stringify(p.tech_stack.split(',').map((s: string) => s.trim()).filter(Boolean)) : (typeof existing.tech_stack === 'string' ? existing.tech_stack : JSON.stringify(existing.tech_stack || [])));
+
+    const live_url = p.live_url !== undefined 
+      ? (p.live_url && String(p.live_url).trim() ? String(p.live_url).trim() : null) 
+      : existing.live_url;
+    const repo_url = p.repo_url !== undefined 
+      ? (p.repo_url && String(p.repo_url).trim() ? String(p.repo_url).trim() : null) 
+      : existing.repo_url;
+    const client_name = p.client_name !== undefined 
+      ? (p.client_name && String(p.client_name).trim() ? String(p.client_name).trim() : null) 
+      : existing.client_name;
+    const completion_date = p.completion_date !== undefined ? String(p.completion_date) : existing.completion_date;
+    const is_featured = p.is_featured !== undefined ? Boolean(p.is_featured) : Boolean(existing.is_featured);
+    const is_published = p.is_published !== undefined ? Boolean(p.is_published) : Boolean(existing.is_published);
+    
+    const metrics = Array.isArray(p.metrics)
+      ? JSON.stringify(p.metrics)
+      : (typeof p.metrics === 'string' ? p.metrics : (typeof existing.metrics === 'string' ? existing.metrics : JSON.stringify(existing.metrics || [])));
+
     await pg.query(
       `UPDATE projects SET
         slug = $1,
@@ -796,29 +808,30 @@ apiRouter.put('/admin/projects/:id', requireAdmin, async (req, res) => {
         updated_at = CURRENT_TIMESTAMP
        WHERE id = $16`,
       [
-        p.slug,
-        p.title,
-        p.category,
-        p.short_description,
-        p.full_case_study,
-        p.cover_image,
-        JSON.stringify(p.gallery_images || []),
-        JSON.stringify(p.tech_stack || []),
-        p.live_url,
-        p.repo_url,
-        p.client_name,
-        p.completion_date,
-        p.is_featured,
-        p.is_published,
-        JSON.stringify(p.metrics || []),
+        slug,
+        title,
+        category,
+        short_description,
+        full_case_study,
+        cover_image,
+        gallery_images,
+        tech_stack,
+        live_url,
+        repo_url,
+        client_name,
+        completion_date,
+        is_featured,
+        is_published,
+        metrics,
         id
       ]
     );
 
-    await logAdminAction(admin.id, admin.name, 'UPDATE_PROJECT', 'project', id, { title: p.title });
+    await logAdminAction(admin.id, admin.name, 'UPDATE_PROJECT', 'project', id, { title });
     res.json({ success: true, message: 'Project updated successfully.' });
   } catch (err: any) {
-    res.status(500).json({ error: 'Failed to update project.' });
+    console.error('Project update error:', err);
+    res.status(500).json({ error: err?.message || 'Failed to update project.' });
   }
 });
 
@@ -826,10 +839,17 @@ apiRouter.delete('/admin/projects/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const admin = (req as any).adminUser;
+    const check = await pg.query('SELECT title FROM projects WHERE id = $1', [id]);
+    if (check.rows.length === 0) {
+      res.status(404).json({ error: 'Project not found.' });
+      return;
+    }
+    const projectTitle = (check.rows[0] as any).title;
     await pg.query('DELETE FROM projects WHERE id = $1', [id]);
-    await logAdminAction(admin.id, admin.name, 'DELETE_PROJECT', 'project', id);
+    await logAdminAction(admin.id, admin.name, 'DELETE_PROJECT', 'project', id, { title: projectTitle });
     res.json({ success: true, message: 'Project deleted successfully.' });
   } catch (err: any) {
+    console.error('Project delete error:', err);
     res.status(500).json({ error: 'Failed to delete project.' });
   }
 });
@@ -944,7 +964,7 @@ apiRouter.delete('/admin/blog/:id', requireAdmin, async (req, res) => {
 });
 
 // Admin Media Upload
-apiRouter.post('/admin/media/upload', requireAdmin, upload.single('file'), async (req, res) => {
+apiRouter.post('/admin/media/upload', requireAdmin, upload.single('file') as any, async (req, res) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'No file uploaded or file type unsupported.' });

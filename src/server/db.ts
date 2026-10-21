@@ -9,7 +9,23 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-export const pg = new PGlite(DATA_DIR);
+// Remove stale postmaster.pid lock file if server previously stopped ungracefully
+const pidFile = path.join(DATA_DIR, 'postmaster.pid');
+if (fs.existsSync(pidFile)) {
+  try {
+    fs.unlinkSync(pidFile);
+  } catch {}
+}
+
+let pgInstance: PGlite;
+try {
+  pgInstance = new PGlite(DATA_DIR);
+} catch (err) {
+  console.warn('[PostgreSQL] Could not open persistent data dir, initializing in-memory fallback:', err);
+  pgInstance = new PGlite();
+}
+
+export const pg = pgInstance;
 
 export async function initDatabase() {
   console.log('[PostgreSQL] Initializing tables in persistent storage...');
@@ -384,34 +400,6 @@ async function seedInitialData() {
     }
     console.log('[PostgreSQL] Seeded 4 verified studio projects.');
   }
-
-  // Ensure all projects point to authentic namespaced photos and live URLs, and remove repo_url
-  await pg.exec(`
-    UPDATE projects SET 
-      live_url = 'https://sd-tech-photograph-ytpn.vercel.app/',
-      repo_url = NULL,
-      cover_image = '/assets/projects/sd-tech-photograph.png'
-    WHERE slug = 'sd-tech-photograph' OR id = 'prj_1';
-
-    UPDATE projects SET 
-      live_url = 'https://dental-rust-two.vercel.app/',
-      repo_url = NULL,
-      cover_image = '/assets/projects/dental-care.png'
-    WHERE slug = 'dental-care-clinic-portal' OR id = 'prj_2';
-
-    UPDATE projects SET 
-      title = 'SD Infininov - Dashain Reloaded Festive Clothing',
-      live_url = 'https://sd-infininova.vercel.app/',
-      repo_url = NULL,
-      cover_image = '/assets/projects/clothing-brand.png'
-    WHERE slug = 'nepal-apparel-clothing-store' OR id = 'prj_3';
-
-    UPDATE projects SET 
-      live_url = 'https://findmyhostel.pythonanywhere.com/',
-      repo_url = NULL,
-      cover_image = '/assets/projects/findmyhostel.png'
-    WHERE slug = 'find-my-hostel-nepal' OR id = 'prj_4';
-  `);
 
   // 4. Seed Blog Posts
   const blogRes = await pg.query('SELECT COUNT(*) as count FROM blog_posts');

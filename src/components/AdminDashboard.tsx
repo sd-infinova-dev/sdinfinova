@@ -26,9 +26,10 @@ import { BrandLogo } from './BrandLogo';
 
 interface AdminDashboardProps {
   onClose: () => void;
+  onDataChanged?: () => void;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataChanged }) => {
   // Auth state
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('sd_admin_token'));
   const [adminUser, setAdminUser] = useState<any>(null);
@@ -56,11 +57,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [inquirySearch, setInquirySearch] = useState('');
   const [inquiryStatusFilter, setInquiryStatusFilter] = useState('all');
 
-  // Modals
+  // Modals & Action States
   const [editingProject, setEditingProject] = useState<any | null>(null);
   const [editingPost, setEditingPost] = useState<any | null>(null);
   const [selectedInquiryDetail, setSelectedInquiryDetail] = useState<any | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  // In-app Delete Confirmation (replaces blocked window.confirm)
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: 'project' | 'blog' | 'inquiry';
+    id: string;
+    name: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Modal Error & Loading States
+  const [projectModalError, setProjectModalError] = useState<string | null>(null);
+  const [blogModalError, setBlogModalError] = useState<string | null>(null);
+  const [isSavingProject, setIsSavingProject] = useState(false);
+  const [isSavingBlog, setIsSavingBlog] = useState(false);
 
   // Check auth on mount
   useEffect(() => {
@@ -195,20 +210,62 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     }
   };
 
-  const handleDeleteInquiry = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this inquiry record?')) return;
+  const handleDeleteInquiry = (inq: any) => {
+    setDeleteTarget({
+      type: 'inquiry',
+      id: inq.id,
+      name: `${inq.name}'s inquiry`
+    });
+  };
+
+  const handleDeleteProject = (proj: any) => {
+    setDeleteTarget({
+      type: 'project',
+      id: proj.id,
+      name: proj.title || 'Untitled Project'
+    });
+  };
+
+  const handleDeleteBlog = (post: any) => {
+    setDeleteTarget({
+      type: 'blog',
+      id: post.id,
+      name: post.title || 'Untitled Article'
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
     try {
-      const res = await fetch(`/api/v1/admin/inquiries/${id}`, {
+      let url = '';
+      if (deleteTarget.type === 'project') url = `/api/v1/admin/projects/${deleteTarget.id}`;
+      else if (deleteTarget.type === 'blog') url = `/api/v1/admin/blog/${deleteTarget.id}`;
+      else if (deleteTarget.type === 'inquiry') url = `/api/v1/admin/inquiries/${deleteTarget.id}`;
+
+      const res = await fetch(url, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
+
       if (res.ok) {
-        setStatusMessage('Inquiry record deleted.');
-        loadTabData();
-        setSelectedInquiryDetail(null);
+        const itemLabel = deleteTarget.type === 'project' ? 'Project' : deleteTarget.type === 'blog' ? 'Article' : 'Inquiry';
+        setStatusMessage(`${itemLabel} permanently deleted from database.`);
+        setDeleteTarget(null);
+        await loadTabData();
+        onDataChanged?.();
+        if (deleteTarget.type === 'inquiry') {
+          setSelectedInquiryDetail(null);
+        }
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setStatusMessage(d.error || 'Failed to delete record.');
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error('Delete error:', e);
+      setStatusMessage('Network error occurred during deletion.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -216,11 +273,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProject) return;
+    setProjectModalError(null);
+    setIsSavingProject(true);
 
     try {
       const isNew = !editingProject.id;
       const url = isNew ? '/api/v1/admin/projects' : `/api/v1/admin/projects/${editingProject.id}`;
       const method = isNew ? 'POST' : 'PUT';
+
+      // Parse tech_stack correctly (accept array or comma-separated string)
+      const techStackParsed = Array.isArray(editingProject.tech_stack)
+        ? editingProject.tech_stack
+        : (typeof editingProject.tech_stack === 'string'
+            ? editingProject.tech_stack.split(',').map((s: string) => s.trim()).filter(Boolean)
+            : ['React', 'TypeScript', 'Tailwind CSS']);
+
+      const payload = {
+        ...editingProject,
+        tech_stack: techStackParsed,
+        slug: (editingProject.slug && editingProject.slug.trim()) || editingProject.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      };
 
       const res = await fetch(url, {
         method,
@@ -228,35 +300,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(editingProject)
+        body: JSON.stringify(payload)
       });
 
+      const d = await res.json().catch(() => ({}));
+
       if (res.ok) {
-        setStatusMessage(isNew ? 'New project published.' : 'Project updated.');
+        setStatusMessage(isNew ? 'New project published successfully.' : 'Project changes saved to database.');
         setEditingProject(null);
-        loadTabData();
+        await loadTabData();
+        onDataChanged?.();
       } else {
-        const d = await res.json();
-        alert(d.error || 'Failed to save project');
+        setProjectModalError(d.error || 'Failed to save project. Please check requirements.');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-    }
-  };
-
-  const handleDeleteProject = async (id: string) => {
-    if (!confirm('Permanently delete this project from the database?')) return;
-    try {
-      const res = await fetch(`/api/v1/admin/projects/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        setStatusMessage('Project deleted.');
-        loadTabData();
-      }
-    } catch (e) {
-      console.error(e);
+      setProjectModalError(e?.message || 'Network error saving project.');
+    } finally {
+      setIsSavingProject(false);
     }
   };
 
@@ -264,6 +325,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const handleSaveBlog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPost) return;
+    setBlogModalError(null);
+    setIsSavingBlog(true);
 
     try {
       const isNew = !editingPost.id;
@@ -279,32 +342,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         body: JSON.stringify(editingPost)
       });
 
-      if (res.ok) {
-        setStatusMessage(isNew ? 'Article created.' : 'Article updated.');
-        setEditingPost(null);
-        loadTabData();
-      } else {
-        const d = await res.json();
-        alert(d.error || 'Failed to save article');
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+      const d = await res.json().catch(() => ({}));
 
-  const handleDeleteBlog = async (id: string) => {
-    if (!confirm('Permanently delete this article?')) return;
-    try {
-      const res = await fetch(`/api/v1/admin/blog/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
       if (res.ok) {
-        setStatusMessage('Article deleted.');
-        loadTabData();
+        setStatusMessage(isNew ? 'Article published.' : 'Article updated successfully.');
+        setEditingPost(null);
+        await loadTabData();
+        onDataChanged?.();
+      } else {
+        setBlogModalError(d.error || 'Failed to save article.');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setBlogModalError(e?.message || 'Network error saving article.');
+    } finally {
+      setIsSavingBlog(false);
     }
   };
 
@@ -895,7 +947,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                               Details
                             </button>
                             <button
-                              onClick={() => handleDeleteInquiry(inq.id)}
+                              onClick={() => handleDeleteInquiry(inq)}
                               className="p-1 text-[#6b7280] hover:text-red-400 cursor-pointer"
                               title="Delete inquiry"
                             >
@@ -1080,15 +1132,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => setEditingProject(proj)}
-                          className="p-1.5 text-[#9ca3af] hover:text-white rounded bg-[#181b22] border border-white/[0.06]"
+                          onClick={() => {
+                            setProjectModalError(null);
+                            setEditingProject(proj);
+                          }}
+                          className="p-1.5 text-[#9ca3af] hover:text-white rounded bg-[#181b22] border border-white/[0.06] cursor-pointer"
                           title="Edit Project"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => handleDeleteProject(proj.id)}
-                          className="p-1.5 text-[#9ca3af] hover:text-red-400 rounded bg-[#181b22] border border-white/[0.06]"
+                          onClick={() => handleDeleteProject(proj)}
+                          className="p-1.5 text-[#9ca3af] hover:text-red-400 rounded bg-[#181b22] border border-white/[0.06] cursor-pointer"
                           title="Delete Project"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1104,13 +1159,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                 <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
                   <div className="bg-[#111317] border border-white/[0.1] rounded-2xl max-w-2xl w-full p-6 space-y-4 my-8 shadow-2xl">
                     <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
-                      <h3 className="text-base font-bold text-white">
-                        {editingProject.id ? 'Edit Project' : 'Create New Project'}
-                      </h3>
-                      <button onClick={() => setEditingProject(null)} className="text-[#6b7280] hover:text-white">
+                      <div>
+                        <h3 className="text-base font-bold text-white">
+                          {editingProject.id ? 'Edit Project' : 'Create New Project'}
+                        </h3>
+                        {editingProject.id && (
+                          <div className="text-[10px] font-mono text-[#9ca3af]">ID: {editingProject.id}</div>
+                        )}
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setEditingProject(null);
+                          setProjectModalError(null);
+                        }} 
+                        className="text-[#6b7280] hover:text-white cursor-pointer"
+                      >
                         &times;
                       </button>
                     </div>
+
+                    {projectModalError && (
+                      <div className="p-3 rounded-xl bg-red-950/60 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                        <span>{projectModalError}</span>
+                      </div>
+                    )}
 
                     <form onSubmit={handleSaveProject} className="space-y-4 text-xs">
                       <div className="grid grid-cols-2 gap-4">
@@ -1138,6 +1211,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div>
+                          <label className="block text-[#9ca3af] mb-1">Project Slug (URL Identifier)</label>
+                          <input
+                            type="text"
+                            value={editingProject.slug || ''}
+                            placeholder="auto-generated-from-title"
+                            onChange={(e) => setEditingProject({ ...editingProject, slug: e.target.value })}
+                            className="w-full p-2 rounded-lg bg-[#171a22] border border-white/[0.08] text-white font-mono"
+                          />
+                        </div>
+                        <div>
                           <label className="block text-[#9ca3af] mb-1">Client Name</label>
                           <input
                             type="text"
@@ -1146,6 +1229,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                             className="w-full p-2 rounded-lg bg-[#171a22] border border-white/[0.08] text-white"
                           />
                         </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-[#9ca3af] mb-1">Completion Year</label>
                           <input
@@ -1153,6 +1239,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                             value={editingProject.completion_date || '2026'}
                             onChange={(e) => setEditingProject({ ...editingProject, completion_date: e.target.value })}
                             className="w-full p-2 rounded-lg bg-[#171a22] border border-white/[0.08] text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[#9ca3af] mb-1">Tech Stack (comma-separated)</label>
+                          <input
+                            type="text"
+                            value={Array.isArray(editingProject.tech_stack) ? editingProject.tech_stack.join(', ') : (editingProject.tech_stack || '')}
+                            placeholder="React, TypeScript, Tailwind CSS, PostgreSQL"
+                            onChange={(e) => setEditingProject({ ...editingProject, tech_stack: e.target.value })}
+                            className="w-full p-2 rounded-lg bg-[#171a22] border border-white/[0.08] text-white font-mono"
                           />
                         </div>
                       </div>
@@ -1220,16 +1316,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                       <div className="flex justify-end gap-3 pt-4 border-t border-white/[0.08]">
                         <button
                           type="button"
-                          onClick={() => setEditingProject(null)}
-                          className="px-4 py-2 rounded-lg text-[#9ca3af] hover:text-white"
+                          onClick={() => {
+                            setEditingProject(null);
+                            setProjectModalError(null);
+                          }}
+                          className="px-4 py-2 rounded-lg text-[#9ca3af] hover:text-white cursor-pointer"
                         >
                           Cancel
                         </button>
                         <button
                           type="submit"
-                          className="px-5 py-2 bg-[#d89f66] text-[#090a0c] font-bold rounded-lg hover:bg-[#eec397]"
+                          disabled={isSavingProject}
+                          className="px-5 py-2 bg-[#d89f66] text-[#090a0c] font-bold rounded-lg hover:bg-[#eec397] transition-colors cursor-pointer disabled:opacity-50"
                         >
-                          Save Project
+                          {isSavingProject ? 'Saving to Database...' : 'Save Project'}
                         </button>
                       </div>
                     </form>
@@ -1296,15 +1396,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
                     <div className="flex items-center gap-2 shrink-0">
                       <button
-                        onClick={() => setEditingPost(post)}
-                        className="p-2 text-[#9ca3af] hover:text-white rounded bg-[#181b22] border border-white/[0.06]"
+                        onClick={() => {
+                          setBlogModalError(null);
+                          setEditingPost(post);
+                        }}
+                        className="p-2 text-[#9ca3af] hover:text-white rounded bg-[#181b22] border border-white/[0.06] cursor-pointer"
                         title="Edit Article"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleDeleteBlog(post.id)}
-                        className="p-2 text-[#9ca3af] hover:text-red-400 rounded bg-[#181b22] border border-white/[0.06]"
+                        onClick={() => handleDeleteBlog(post)}
+                        className="p-2 text-[#9ca3af] hover:text-red-400 rounded bg-[#181b22] border border-white/[0.06] cursor-pointer"
                         title="Delete Article"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1319,13 +1422,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                 <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
                   <div className="bg-[#111317] border border-white/[0.1] rounded-2xl max-w-2xl w-full p-6 space-y-4 my-8 shadow-2xl">
                     <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
-                      <h3 className="text-base font-bold text-white">
-                        {editingPost.id ? 'Edit Article' : 'Write New Article'}
-                      </h3>
-                      <button onClick={() => setEditingPost(null)} className="text-[#6b7280] hover:text-white">
+                      <div>
+                        <h3 className="text-base font-bold text-white">
+                          {editingPost.id ? 'Edit Article' : 'Write New Article'}
+                        </h3>
+                        {editingPost.id && (
+                          <div className="text-[10px] font-mono text-[#9ca3af]">ID: {editingPost.id}</div>
+                        )}
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setEditingPost(null);
+                          setBlogModalError(null);
+                        }} 
+                        className="text-[#6b7280] hover:text-white cursor-pointer"
+                      >
                         &times;
                       </button>
                     </div>
+
+                    {blogModalError && (
+                      <div className="p-3 rounded-xl bg-red-950/60 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                        <span>{blogModalError}</span>
+                      </div>
+                    )}
 
                     <form onSubmit={handleSaveBlog} className="space-y-4 text-xs">
                       <div>
@@ -1394,16 +1515,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                       <div className="flex justify-end gap-3 pt-4 border-t border-white/[0.08]">
                         <button
                           type="button"
-                          onClick={() => setEditingPost(null)}
-                          className="px-4 py-2 rounded-lg text-[#9ca3af] hover:text-white"
+                          onClick={() => {
+                            setEditingPost(null);
+                            setBlogModalError(null);
+                          }}
+                          className="px-4 py-2 rounded-lg text-[#9ca3af] hover:text-white cursor-pointer"
                         >
                           Cancel
                         </button>
                         <button
                           type="submit"
-                          className="px-5 py-2 bg-[#d89f66] text-[#090a0c] font-bold rounded-lg hover:bg-[#eec397]"
+                          disabled={isSavingBlog}
+                          className="px-5 py-2 bg-[#d89f66] text-[#090a0c] font-bold rounded-lg hover:bg-[#eec397] transition-colors cursor-pointer disabled:opacity-50"
                         >
-                          Save Article
+                          {isSavingBlog ? 'Saving Article...' : 'Save Article'}
                         </button>
                       </div>
                     </form>
@@ -1591,6 +1716,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           )}
         </main>
       </div>
+
+      {/* In-app Delete Confirmation Modal (Iframe-safe) */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#111317] border border-white/[0.1] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3 text-red-400">
+              <div className="w-10 h-10 rounded-full bg-red-950/60 border border-red-500/20 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Confirm Permanent Deletion</h3>
+                <p className="text-xs text-[#9ca3af]">Database record removal</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-[#d1d5db] leading-relaxed">
+              Are you sure you want to permanently delete{' '}
+              <strong className="text-white font-semibold">"{deleteTarget.name}"</strong>? This will remove the {deleteTarget.type === 'project' ? 'project case study' : deleteTarget.type === 'blog' ? 'blog article' : 'inquiry record'} from PostgreSQL.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/[0.08]">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeleteTarget(null)}
+                className="px-4 py-2 rounded-xl text-xs text-[#9ca3af] hover:text-white hover:bg-white/[0.05] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 rounded-xl text-xs bg-red-600 hover:bg-red-500 text-white font-bold transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

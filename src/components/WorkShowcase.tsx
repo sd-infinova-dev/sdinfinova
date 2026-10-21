@@ -25,46 +25,36 @@ interface WorkShowcaseProps {
 }
 
 const resolveProjectImage = (project: { slug?: string; id?: string; cover_image?: string }) => {
+  // If an authentic cover image URL is provided, use it directly
+  if (project.cover_image && project.cover_image.trim() && !project.cover_image.includes(':\\')) {
+    return project.cover_image.trim();
+  }
   const slug = (project.slug || '').toLowerCase();
   const id = (project.id || '').toLowerCase();
-  const cover = (project.cover_image || '').toLowerCase();
 
-  if (slug.includes('cloth') || slug.includes('apparel') || id === 'prj_3' || cover.includes('clothing')) {
+  if (slug.includes('cloth') || slug.includes('apparel') || id === 'prj_3') {
     return '/assets/projects/clothing-brand.png';
   }
-  if (slug.includes('dent') || slug.includes('clinic') || id === 'prj_2' || cover.includes('dental')) {
+  if (slug.includes('dent') || slug.includes('clinic') || id === 'prj_2') {
     return '/assets/projects/dental-care.png';
   }
-  if (slug.includes('hostel') || id === 'prj_4' || cover.includes('hostel')) {
+  if (slug.includes('hostel') || id === 'prj_4') {
     return '/assets/projects/findmyhostel.png';
   }
-  if (slug.includes('photo') || id === 'prj_1' || cover.includes('photo') || cover.includes('sd-tech')) {
+  if (slug.includes('photo') || id === 'prj_1') {
     return '/assets/projects/sd-tech-photograph.png';
-  }
-  if (project.cover_image && !project.cover_image.includes(':\\')) {
-    return project.cover_image;
   }
   return '/assets/projects/sd-tech-photograph.png';
 };
 
-const resolveProjectLiveUrl = (project: { slug?: string; id?: string; title?: string; live_url?: string }) => {
-  const slug = (project.slug || '').toLowerCase();
-  const id = (project.id || '').toLowerCase();
-  const title = (project.title || '').toLowerCase();
-
-  if (slug.includes('hostel') || id === 'prj_4' || title.includes('hostel')) {
-    return 'https://findmyhostel.pythonanywhere.com/';
+export const getValidLiveUrl = (url?: string | null): string | null => {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed || trimmed === '#' || trimmed.toLowerCase() === 'null') return null;
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return `https://${trimmed}`;
   }
-  if (slug.includes('photo') || id === 'prj_1' || title.includes('photo') || title.includes('sd tech')) {
-    return 'https://sd-tech-photograph-ytpn.vercel.app/';
-  }
-  if (slug.includes('dent') || slug.includes('clinic') || id === 'prj_2' || title.includes('dental') || title.includes('denta')) {
-    return 'https://dental-rust-two.vercel.app/';
-  }
-  if (slug.includes('cloth') || slug.includes('apparel') || id === 'prj_3' || title.includes('clothing') || title.includes('apparel') || title.includes('dashain')) {
-    return 'https://sd-infininova.vercel.app/';
-  }
-  return project.live_url || '#';
+  return trimmed;
 };
 
 export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading }) => {
@@ -133,7 +123,7 @@ export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading })
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {filteredProjects.map((project) => {
-              const liveUrl = resolveProjectLiveUrl(project);
+              const liveUrl = getValidLiveUrl(project.live_url);
               const coverImg = resolveProjectImage(project);
 
               return (
@@ -153,18 +143,20 @@ export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading })
                         loading="lazy"
                       />
 
-                      {/* Top-right open action indicator */}
-                      <a
-                        href={liveUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        aria-label={`Open ${project.title} live site`}
-                        className="absolute top-4 right-4 w-9 h-9 rounded-full bg-[#090a0c]/85 backdrop-blur-sm border border-white/10 flex items-center justify-center text-white/80 hover:text-[#f3c49f] hover:bg-[#c8824f]/30 hover:border-[#c8824f]/60 transition-all z-10"
-                        title="View Live Project"
-                      >
-                        <ArrowUpRight className="w-4 h-4" />
-                      </a>
+                      {/* Top-right open action indicator - only rendered if a live demo URL exists */}
+                      {liveUrl && (
+                        <a
+                          href={liveUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Open ${project.title} live site`}
+                          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-[#090a0c]/85 backdrop-blur-sm border border-white/10 flex items-center justify-center text-white/80 hover:text-[#f3c49f] hover:bg-[#c8824f]/30 hover:border-[#c8824f]/60 transition-all z-10"
+                          title="View Live Project"
+                        >
+                          <ArrowUpRight className="w-4 h-4" />
+                        </a>
+                      )}
                     </div>
 
                     {/* Project Content */}
@@ -209,15 +201,17 @@ export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading })
                     <span className="text-xs text-[#9ca3af] font-medium group-hover:text-white transition-colors">
                       Case Study &amp; Architecture →
                     </span>
-                    <a
-                      href={liveUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="px-3.5 py-1.5 text-xs font-semibold text-[#090a0d] bg-[#c8824f] hover:bg-[#e8a879] rounded-lg inline-flex items-center gap-1.5 transition-colors shadow-sm"
-                    >
-                      View Live <ExternalLink className="w-3 h-3" />
-                    </a>
+                    {liveUrl && (
+                      <a
+                        href={liveUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="px-3.5 py-1.5 text-xs font-semibold text-[#090a0d] bg-[#c8824f] hover:bg-[#e8a879] rounded-lg inline-flex items-center gap-1.5 transition-colors shadow-sm"
+                      >
+                        View Live <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
                 </div>
               );
@@ -322,17 +316,19 @@ export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading })
                 )}
               </div>
 
-              {/* Action Buttons (Repository removed, only View Live Project) */}
-              <div className="flex items-center gap-3 pt-4 border-t border-white/[0.08]">
-                <a
-                  href={resolveProjectLiveUrl(activeProjectModal)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-6 py-2.5 text-xs font-semibold text-[#090a0d] bg-[#c8824f] hover:bg-[#e8a879] rounded-lg inline-flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
-                >
-                  View Live Project <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
+              {/* Action Buttons (Repository removed, only View Live Project if URL exists) */}
+              {getValidLiveUrl(activeProjectModal.live_url) && (
+                <div className="flex items-center gap-3 pt-4 border-t border-white/[0.08]">
+                  <a
+                    href={getValidLiveUrl(activeProjectModal.live_url)!}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-6 py-2.5 text-xs font-semibold text-[#090a0d] bg-[#c8824f] hover:bg-[#e8a879] rounded-lg inline-flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+                  >
+                    View Live Project <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         )}
