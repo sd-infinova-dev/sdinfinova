@@ -82,7 +82,7 @@ export const ProjectEstimator: React.FC<ProjectEstimatorProps> = ({
   };
 
   return (
-    <div className="bg-[#101217] border border-white/[0.08] rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden">
+    <div className="bg-[#101217] border border-white/[0.08] rounded-3xl p-4 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden">
       {/* Subtle top reflection accent */}
       <div className="absolute top-0 inset-x-8 h-[1px] bg-gradient-to-r from-transparent via-[#d89f66]/40 to-transparent" />
 
@@ -218,7 +218,7 @@ export const ProjectEstimator: React.FC<ProjectEstimatorProps> = ({
             </div>
 
             <div className="space-y-2.5">
-              <label className="p-3 rounded-xl bg-[#14161c] border border-white/[0.06] flex items-center justify-between cursor-pointer hover:border-white/[0.1] transition-colors">
+              <label className="p-3 rounded-xl bg-[#14161c] border border-white/[0.06] flex items-start sm:items-center justify-between gap-3 cursor-pointer hover:border-white/[0.1] transition-colors">
                 <div>
                   <div className="text-xs font-medium text-white">Automated Payment Gateway Integration</div>
                   <div className="text-[11px] text-[#6b7280]">
@@ -229,11 +229,11 @@ export const ProjectEstimator: React.FC<ProjectEstimatorProps> = ({
                   type="checkbox"
                   checked={requirePaymentGateway}
                   onChange={(e) => setRequirePaymentGateway(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#d89f66] accent-[#d89f66]"
+                  className="w-4 h-4 rounded text-[#d89f66] accent-[#d89f66] shrink-0 mt-0.5 sm:mt-0"
                 />
               </label>
 
-              <label className="p-3 rounded-xl bg-[#14161c] border border-white/[0.06] flex items-center justify-between cursor-pointer hover:border-white/[0.1] transition-colors">
+              <label className="p-3 rounded-xl bg-[#14161c] border border-white/[0.06] flex items-start sm:items-center justify-between gap-3 cursor-pointer hover:border-white/[0.1] transition-colors">
                 <div>
                   <div className="text-xs font-medium text-white">Custom Portal &amp; Database Authentication</div>
                   <div className="text-[11px] text-[#6b7280]">
@@ -244,11 +244,11 @@ export const ProjectEstimator: React.FC<ProjectEstimatorProps> = ({
                   type="checkbox"
                   checked={requireCustomAuth}
                   onChange={(e) => setRequireCustomAuth(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#d89f66] accent-[#d89f66]"
+                  className="w-4 h-4 rounded text-[#d89f66] accent-[#d89f66] shrink-0 mt-0.5 sm:mt-0"
                 />
               </label>
 
-              <label className="p-3 rounded-xl bg-[#14161c] border border-white/[0.06] flex items-center justify-between cursor-pointer hover:border-white/[0.1] transition-colors">
+              <label className="p-3 rounded-xl bg-[#14161c] border border-white/[0.06] flex items-start sm:items-center justify-between gap-3 cursor-pointer hover:border-white/[0.1] transition-colors">
                 <div>
                   <div className="text-xs font-medium text-white">Automated Booking &amp; Scheduling Engine</div>
                   <div className="text-[11px] text-[#6b7280]">
@@ -259,7 +259,7 @@ export const ProjectEstimator: React.FC<ProjectEstimatorProps> = ({
                   type="checkbox"
                   checked={requireBookingSystem}
                   onChange={(e) => setRequireBookingSystem(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#d89f66] accent-[#d89f66]"
+                  className="w-4 h-4 rounded text-[#d89f66] accent-[#d89f66] shrink-0 mt-0.5 sm:mt-0"
                 />
               </label>
             </div>
@@ -268,7 +268,7 @@ export const ProjectEstimator: React.FC<ProjectEstimatorProps> = ({
 
         {/* Right Column: Live Estimate Breakdown & Form Pre-fill CTA */}
         <div className="lg:col-span-5 flex flex-col justify-between">
-          <div className="bg-[#14161d] border border-white/[0.08] rounded-2xl p-6 space-y-5">
+          <div className="bg-[#14161d] border border-white/[0.08] rounded-2xl p-4 sm:p-6 space-y-5">
             <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
               <span className="text-xs font-mono uppercase tracking-wider text-[#9ca3af]">
                 Estimated Scope Summary

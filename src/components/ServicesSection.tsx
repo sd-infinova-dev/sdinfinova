@@ -67,7 +67,7 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
             return (
               <div
                 key={service.id}
-                className="surface-card rounded-2xl p-6 sm:p-8 transition-all duration-300 flex flex-col justify-between"
+                className="surface-card rounded-2xl p-5 sm:p-8 transition-all duration-300 flex flex-col justify-between"
               >
                 <div>
                   {/* Top Bar: Clean Number + Icon */}
@@ -126,7 +126,7 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
                 </div>
 
                 {/* Bottom Action Footer */}
-                <div className="pt-6 mt-6 border-t border-white/[0.06] flex items-center justify-between">
+                <div className="pt-6 mt-6 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-3">
                   <button
                     onClick={() => toggleExpand(service.id)}
                     className="text-xs text-[#9ca3af] hover:text-[#f1f2f4] font-medium flex items-center gap-1 cursor-pointer transition-colors"

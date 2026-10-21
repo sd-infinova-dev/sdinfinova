@@ -56,19 +56,19 @@ export const FAQSection: React.FC = () => {
               >
                 <button
                   onClick={() => setOpenIndex(isOpen ? null : idx)}
-                  className="w-full p-6 text-left flex items-center justify-between gap-4 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d89f66]"
+                  className="w-full p-4 sm:p-6 text-left flex items-center justify-between gap-3 sm:gap-4 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d89f66]"
                 >
-                  <span className="font-bold text-[#f1f2f4] text-base sm:text-lg">
+                  <span className="font-bold text-[#f1f2f4] text-sm sm:text-lg leading-snug">
                     {faq.q}
                   </span>
-                  <div className={`w-8 h-8 rounded-full bg-[#181b22] border border-white/[0.06] flex items-center justify-center shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-[#d89f66]' : 'text-[#9ca3af]'}`}>
+                  <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#181b22] border border-white/[0.06] flex items-center justify-center shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-[#d89f66]' : 'text-[#9ca3af]'}`}>
                     <ChevronDown className="w-4 h-4" />
                   </div>
                 </button>
 
                 {isOpen && (
-                  <div className="px-6 pb-6 pt-0 text-sm leading-relaxed text-[#9ca3af] border-t border-white/[0.04]">
-                    <div className="pt-4">{faq.a}</div>
+                  <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0 text-xs sm:text-sm leading-relaxed text-[#9ca3af] border-t border-white/[0.04]">
+                    <div className="pt-3 sm:pt-4">{faq.a}</div>
                   </div>
                 )}
               </div>

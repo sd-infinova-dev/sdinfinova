@@ -10,6 +10,10 @@ import nodemailer from 'nodemailer';
 
 export const apiRouter = Router();
 
+// Public routes that are exempt from CSRF protection.
+// Mount this router BEFORE csurf() middleware in server.ts.
+export const publicApiRouter = Router();
+
 // Ensure upload directory exists
 const UPLOADS_DIR = path.resolve(process.cwd(), 'public/uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -154,6 +158,34 @@ apiRouter.get('/projects', async (req, res) => {
       query += ` AND is_featured = true`;
     }
 
+    // Ensure legacy paths are updated to authentic namespaced assets and verified live URLs
+    await pg.exec(`
+      UPDATE projects SET 
+        live_url = 'https://sd-tech-photograph-ytpn.vercel.app/',
+        repo_url = NULL,
+        cover_image = '/assets/projects/sd-tech-photograph.png'
+      WHERE slug = 'sd-tech-photograph' OR id = 'prj_1';
+
+      UPDATE projects SET 
+        live_url = 'https://dental-rust-two.vercel.app/',
+        repo_url = NULL,
+        cover_image = '/assets/projects/dental-care.png'
+      WHERE slug = 'dental-care-clinic-portal' OR id = 'prj_2';
+
+      UPDATE projects SET 
+        title = 'SD Infininov - Dashain Reloaded Festive Clothing',
+        live_url = 'https://sd-infininova.vercel.app/',
+        repo_url = NULL,
+        cover_image = '/assets/projects/clothing-brand.png'
+      WHERE slug = 'nepal-apparel-clothing-store' OR id = 'prj_3';
+
+      UPDATE projects SET 
+        live_url = 'https://findmyhostel.pythonanywhere.com/',
+        repo_url = NULL,
+        cover_image = '/assets/projects/findmyhostel.png'
+      WHERE slug = 'find-my-hostel-nepal' OR id = 'prj_4';
+    `);
+
     query += ' ORDER BY created_at DESC';
     const result = await pg.query(query, params);
 
@@ -236,6 +268,8 @@ apiRouter.get('/blog/:slug', async (req, res) => {
 });
 
 // Submit Contact Inquiry (Public with validation & rate protection)
+// NOTE: This route is registered on publicApiRouter (CSRF-exempt) because
+// it is called from the public-facing contact form without a CSRF token.
 const inquirySchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   business_name: z.string().optional().default(''),
@@ -249,7 +283,7 @@ const inquirySchema = z.object({
   preferred_contact: z.enum(['email', 'phone', 'whatsapp']).default('email')
 });
 
-apiRouter.post('/inquiries', async (req, res) => {
+publicApiRouter.post('/inquiries', async (req, res) => {
   try {
     const parseResult = inquirySchema.safeParse(req.body);
     if (!parseResult.success) {
@@ -390,7 +424,9 @@ apiRouter.post('/inquiries', async (req, res) => {
 });
 
 // Track Privacy-conscious Pageview
-apiRouter.post('/analytics/pageview', async (req, res) => {
+// NOTE: Registered on publicApiRouter (CSRF-exempt) — fire-and-forget ping,
+// contains no sensitive mutation so CSRF protection is not needed.
+publicApiRouter.post('/analytics/pageview', async (req, res) => {
   try {
     const { path: pagePath, referrer } = req.body;
     if (!pagePath || pagePath.startsWith('/admin')) {
@@ -454,7 +490,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     res.cookie('admin_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
@@ -713,7 +749,7 @@ apiRouter.post('/admin/projects', requireAdmin, async (req, res) => {
         p.category || 'Business Website',
         p.short_description || '',
         p.full_case_study || '',
-        p.cover_image || '/assets/aistudio/Screenshot_2026-10-17_122839_0fe2d1b9.png',
+        p.cover_image || '/assets/projects/sd-tech-photograph.png',
         JSON.stringify(p.gallery_images || []),
         JSON.stringify(p.tech_stack || ['React', 'TypeScript', 'Tailwind CSS']),
         p.live_url || '',
@@ -832,7 +868,7 @@ apiRouter.post('/admin/blog', requireAdmin, async (req, res) => {
         b.excerpt || '',
         b.content || '',
         b.author || admin.name,
-        b.cover_image || '/assets/aistudio/Screenshot_2026-10-17_122839_0fe2d1b9.png',
+        b.cover_image || '/assets/projects/clothing-brand.png',
         b.category || 'Web Engineering',
         JSON.stringify(b.tags || ['Nepal', 'Engineering']),
         parseInt(b.reading_time_minutes || '5', 10),

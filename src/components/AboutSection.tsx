@@ -52,7 +52,7 @@ export const AboutSection: React.FC = () => {
 
           {/* Right Column: Studio Profile & Location Card */}
           <div className="lg:col-span-5">
-            <div className="bg-[#111317] border border-white/[0.1] rounded-3xl p-8 space-y-6">
+            <div className="bg-[#111317] border border-white/[0.1] rounded-3xl p-5 sm:p-8 space-y-6">
               <div className="border-b border-white/[0.08] pb-6">
                 <div className="text-xs font-mono text-[#d89f66] mb-1">LOCATION &amp; PRESENCE</div>
                 <h3 className="text-xl font-bold text-[#f1f2f4]">Kathmandu Valley, Nepal</h3>

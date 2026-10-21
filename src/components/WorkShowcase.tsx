@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExternalLink, Github, ArrowUpRight, CheckCircle2, X } from 'lucide-react';
+import { ExternalLink, ArrowUpRight, CheckCircle2, X } from 'lucide-react';
 
 export interface Project {
   id: string;
@@ -24,6 +24,49 @@ interface WorkShowcaseProps {
   loading?: boolean;
 }
 
+const resolveProjectImage = (project: { slug?: string; id?: string; cover_image?: string }) => {
+  const slug = (project.slug || '').toLowerCase();
+  const id = (project.id || '').toLowerCase();
+  const cover = (project.cover_image || '').toLowerCase();
+
+  if (slug.includes('cloth') || slug.includes('apparel') || id === 'prj_3' || cover.includes('clothing')) {
+    return '/assets/projects/clothing-brand.png';
+  }
+  if (slug.includes('dent') || slug.includes('clinic') || id === 'prj_2' || cover.includes('dental')) {
+    return '/assets/projects/dental-care.png';
+  }
+  if (slug.includes('hostel') || id === 'prj_4' || cover.includes('hostel')) {
+    return '/assets/projects/findmyhostel.png';
+  }
+  if (slug.includes('photo') || id === 'prj_1' || cover.includes('photo') || cover.includes('sd-tech')) {
+    return '/assets/projects/sd-tech-photograph.png';
+  }
+  if (project.cover_image && !project.cover_image.includes(':\\')) {
+    return project.cover_image;
+  }
+  return '/assets/projects/sd-tech-photograph.png';
+};
+
+const resolveProjectLiveUrl = (project: { slug?: string; id?: string; title?: string; live_url?: string }) => {
+  const slug = (project.slug || '').toLowerCase();
+  const id = (project.id || '').toLowerCase();
+  const title = (project.title || '').toLowerCase();
+
+  if (slug.includes('hostel') || id === 'prj_4' || title.includes('hostel')) {
+    return 'https://findmyhostel.pythonanywhere.com/';
+  }
+  if (slug.includes('photo') || id === 'prj_1' || title.includes('photo') || title.includes('sd tech')) {
+    return 'https://sd-tech-photograph-ytpn.vercel.app/';
+  }
+  if (slug.includes('dent') || slug.includes('clinic') || id === 'prj_2' || title.includes('dental') || title.includes('denta')) {
+    return 'https://dental-rust-two.vercel.app/';
+  }
+  if (slug.includes('cloth') || slug.includes('apparel') || id === 'prj_3' || title.includes('clothing') || title.includes('apparel') || title.includes('dashain')) {
+    return 'https://sd-infininova.vercel.app/';
+  }
+  return project.live_url || '#';
+};
+
 export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [activeProjectModal, setActiveProjectModal] = useState<Project | null>(null);
@@ -40,7 +83,7 @@ export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading })
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
-            <div className="text-xs font-semibold tracking-[0.2em] text-[#d89f66] uppercase mb-2">
+            <div className="text-xs font-semibold tracking-[0.2em] text-[#c8824f] uppercase mb-2">
               PORTFOLIO &amp; ARCHITECTURAL SHOWCASE
             </div>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-[#f1f2f4] tracking-tight">
@@ -52,16 +95,16 @@ export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading })
           </p>
         </div>
 
-        {/* Filter Controls (Functional Tabs adhering to Zero-Pill rule) */}
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#121418] border border-white/[0.08] rounded-xl max-w-fit mb-12">
+        {/* Filter Controls */}
+        <div className="flex overflow-x-auto no-scrollbar sm:flex-wrap items-center gap-1.5 p-1.5 bg-[#121418] border border-white/[0.08] rounded-xl w-full sm:max-w-fit mb-10 sm:mb-12">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3.5 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+              className={`px-3.5 sm:px-4 py-2 text-xs font-medium rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 selectedCategory === cat
-                  ? 'bg-[#1e222a] text-[#f1f2f4] shadow-sm font-semibold'
-                  : 'text-[#9ca3af] hover:text-[#f1f2f4] hover:bg-white/[0.03]'
+                  ? 'bg-[#1e222b] text-[#f1f2f4] shadow-sm border border-white/[0.08]'
+                  : 'text-[#9ca3af] hover:text-[#f1f2f4] hover:bg-white/[0.04]'
               }`}
             >
               {cat}
@@ -73,90 +116,123 @@ export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading })
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-[#111317] border border-white/[0.06] rounded-2xl p-6 h-80 animate-pulse" />
+              <div key={i} className="surface-card rounded-2xl overflow-hidden animate-pulse">
+                <div className="aspect-[16/10] bg-white/[0.04]" />
+                <div className="p-6 space-y-3">
+                  <div className="h-4 w-24 bg-white/[0.06] rounded" />
+                  <div className="h-6 w-3/4 bg-white/[0.06] rounded" />
+                  <div className="h-4 w-full bg-white/[0.04] rounded" />
+                </div>
+              </div>
             ))}
           </div>
         ) : filteredProjects.length === 0 ? (
-          <div className="text-center py-16 bg-[#111317] border border-white/[0.08] rounded-2xl">
+          <div className="text-center py-16 bg-[#121418] rounded-2xl border border-white/[0.08]">
             <p className="text-[#9ca3af] text-sm">No projects found in this category.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {filteredProjects.map((project) => (
-              <div
-                key={project.id}
-                onClick={() => setActiveProjectModal(project)}
-                className="group surface-card rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl flex flex-col justify-between"
-              >
-                {/* Project Visual Container */}
-                <div className="relative aspect-[16/10] bg-[#14171d] overflow-hidden border-b border-white/[0.06]">
-                  {project.cover_image ? (
-                    <img
-                      src={project.cover_image}
-                      alt={project.title}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover object-top opacity-90 transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[#6b7280]">
-                      <span className="font-mono text-xs">SD INFINOVA ENGINE</span>
+            {filteredProjects.map((project) => {
+              const liveUrl = resolveProjectLiveUrl(project);
+              const coverImg = resolveProjectImage(project);
+
+              return (
+                <div
+                  key={project.id}
+                  onClick={() => setActiveProjectModal(project)}
+                  className="group surface-card rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:border-[#c8824f]/30 flex flex-col justify-between"
+                >
+                  <div>
+                    {/* Project Visual Container */}
+                    <div className="relative aspect-[16/10] bg-[#14171d] overflow-hidden border-b border-white/[0.06]">
+                      <img
+                        src={coverImg}
+                        alt={project.title}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover object-top opacity-95 transition-transform duration-500 group-hover:scale-105"
+                        loading="lazy"
+                      />
+
+                      {/* Top-right open action indicator */}
+                      <a
+                        href={liveUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`Open ${project.title} live site`}
+                        className="absolute top-4 right-4 w-9 h-9 rounded-full bg-[#090a0c]/85 backdrop-blur-sm border border-white/10 flex items-center justify-center text-white/80 hover:text-[#f3c49f] hover:bg-[#c8824f]/30 hover:border-[#c8824f]/60 transition-all z-10"
+                        title="View Live Project"
+                      >
+                        <ArrowUpRight className="w-4 h-4" />
+                      </a>
                     </div>
-                  )}
 
-                  {/* Top-right open action indicator */}
-                  <div className="absolute top-4 right-4 w-9 h-9 rounded-full bg-[#090a0c]/80 backdrop-blur-sm border border-white/10 flex items-center justify-center text-white/80 group-hover:text-[#d89f66] group-hover:border-[#d89f66]/40 transition-colors">
-                    <ArrowUpRight className="w-4 h-4" />
-                  </div>
-                </div>
-
-                {/* Project Content */}
-                <div className="p-6 sm:p-7 space-y-4">
-                  {/* Unboxed Metadata Line (Frontend Constitution Rule) */}
-                  <div className="flex items-center gap-2 text-xs text-[#9ca3af]">
-                    <span className="font-medium text-[#d89f66]">{project.category}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{project.completion_date || '2025'}</span>
-                    {project.client_name && (
-                      <>
+                    {/* Project Content */}
+                    <div className="p-6 sm:p-7 space-y-4">
+                      {/* Metadata Line */}
+                      <div className="flex items-center gap-2 text-xs text-[#9ca3af]">
+                        <span className="font-medium text-[#c8824f]">{project.category}</span>
                         <span aria-hidden="true">·</span>
-                        <span>{project.client_name}</span>
-                      </>
-                    )}
+                        <span>{project.completion_date || '2025'}</span>
+                        {project.client_name && (
+                          <>
+                            <span aria-hidden="true">·</span>
+                            <span>{project.client_name}</span>
+                          </>
+                        )}
+                      </div>
+
+                      <h3 className="text-xl sm:text-2xl font-bold text-[#f1f2f4] group-hover:text-[#c8824f] transition-colors">
+                        {project.title}
+                      </h3>
+
+                      <p className="text-sm text-[#9ca3af] leading-relaxed line-clamp-2">
+                        {project.short_description}
+                      </p>
+
+                      {/* Metrics Row */}
+                      {project.metrics && project.metrics.length > 0 && (
+                        <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/[0.06]">
+                          {project.metrics.map((m, idx) => (
+                            <div key={idx}>
+                              <div className="text-base font-bold font-mono text-[#f1f2f4] tabular-nums">{m.value}</div>
+                              <div className="text-[11px] text-[#6b7280] truncate">{m.label}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <h3 className="text-xl sm:text-2xl font-bold text-[#f1f2f4] group-hover:text-[#d89f66] transition-colors">
-                    {project.title}
-                  </h3>
-
-                  <p className="text-sm text-[#9ca3af] leading-relaxed line-clamp-2">
-                    {project.short_description}
-                  </p>
-
-                  {/* Metrics Row */}
-                  {project.metrics && project.metrics.length > 0 && (
-                    <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/[0.06]">
-                      {project.metrics.map((m, idx) => (
-                        <div key={idx}>
-                          <div className="text-base font-bold font-mono text-[#f1f2f4] tabular-nums">{m.value}</div>
-                          <div className="text-[11px] text-[#6b7280] truncate">{m.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {/* Card Action Footer */}
+                  <div className="px-6 pb-6 pt-2 flex items-center justify-between border-t border-white/[0.04]">
+                    <span className="text-xs text-[#9ca3af] font-medium group-hover:text-white transition-colors">
+                      Case Study &amp; Architecture →
+                    </span>
+                    <a
+                      href={liveUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-3.5 py-1.5 text-xs font-semibold text-[#090a0d] bg-[#c8824f] hover:bg-[#e8a879] rounded-lg inline-flex items-center gap-1.5 transition-colors shadow-sm"
+                    >
+                      View Live <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
         {/* Project Case Study Modal */}
         {activeProjectModal && (
           <div
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
             onClick={() => setActiveProjectModal(null)}
           >
             <div
-              className="bg-[#101217] border border-white/[0.12] rounded-2xl max-w-2xl w-full p-6 sm:p-8 space-y-6 relative my-8 shadow-2xl"
+              className="bg-[#101217] border border-white/[0.12] rounded-2xl max-w-2xl w-full p-4 sm:p-7 lg:p-8 space-y-5 sm:space-y-6 relative my-4 sm:my-8 shadow-2xl max-h-[92vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Close Button */}
@@ -170,7 +246,7 @@ export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading })
 
               {/* Modal Header */}
               <div>
-                <div className="flex items-center gap-2 text-xs text-[#d89f66] font-semibold uppercase tracking-wider mb-2">
+                <div className="flex items-center gap-2 text-xs text-[#c8824f] font-semibold uppercase tracking-wider mb-2">
                   <span>{activeProjectModal.category}</span>
                   <span className="text-white/20">·</span>
                   <span>{activeProjectModal.completion_date}</span>
@@ -186,16 +262,14 @@ export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading })
               </div>
 
               {/* Cover Preview */}
-              {activeProjectModal.cover_image && (
-                <div className="aspect-[16/9] rounded-xl overflow-hidden border border-white/[0.08] bg-[#090a0c]">
-                  <img
-                    src={activeProjectModal.cover_image}
-                    alt={activeProjectModal.title}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
+              <div className="aspect-[16/9] rounded-xl overflow-hidden border border-white/[0.08] bg-[#090a0c]">
+                <img
+                  src={resolveProjectImage(activeProjectModal)}
+                  alt={activeProjectModal.title}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover"
+                />
+              </div>
 
               {/* Case Study Details */}
               <div className="space-y-4 text-sm leading-relaxed text-[#d1d5db]">
@@ -230,17 +304,17 @@ export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading })
                   </div>
                 </div>
 
-                {/* Metrics */}
+                {/* Verified Metrics */}
                 {activeProjectModal.metrics && activeProjectModal.metrics.length > 0 && (
                   <div>
                     <h4 className="text-xs font-bold text-[#f1f2f4] uppercase tracking-wider mb-2">
-                      Verified Impact &amp; Metrics
+                      Verified Client Outcomes
                     </h4>
-                    <div className="grid grid-cols-3 gap-3 p-4 bg-[#14171d] rounded-xl border border-white/[0.06]">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
                       {activeProjectModal.metrics.map((m, idx) => (
-                        <div key={idx}>
-                          <div className="text-lg font-bold font-mono text-[#d89f66] tabular-nums">{m.value}</div>
-                          <div className="text-xs text-[#9ca3af]">{m.label}</div>
+                        <div key={idx} className="p-3 bg-[#181b22] border border-white/[0.08] rounded-xl text-center">
+                          <div className="text-lg font-bold font-mono text-[#c8824f] tabular-nums">{m.value}</div>
+                          <div className="text-[11px] text-[#9ca3af] mt-0.5">{m.label}</div>
                         </div>
                       ))}
                     </div>
@@ -248,28 +322,16 @@ export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading })
                 )}
               </div>
 
-              {/* Action Buttons */}
+              {/* Action Buttons (Repository removed, only View Live Project) */}
               <div className="flex items-center gap-3 pt-4 border-t border-white/[0.08]">
-                {activeProjectModal.live_url && (
-                  <a
-                    href={activeProjectModal.live_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-5 py-2.5 text-xs font-semibold text-[#090a0c] bg-[#d89f66] hover:bg-[#e5b380] rounded-lg inline-flex items-center gap-1.5 transition-colors"
-                  >
-                    View Live Project <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                )}
-                {activeProjectModal.repo_url && (
-                  <a
-                    href={activeProjectModal.repo_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-5 py-2.5 text-xs font-medium text-[#d1d5db] hover:text-white bg-[#181b22] hover:bg-[#20242d] border border-white/[0.08] rounded-lg inline-flex items-center gap-1.5 transition-colors"
-                  >
-                    Repository <Github className="w-3.5 h-3.5" />
-                  </a>
-                )}
+                <a
+                  href={resolveProjectLiveUrl(activeProjectModal)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-6 py-2.5 text-xs font-semibold text-[#090a0d] bg-[#c8824f] hover:bg-[#e8a879] rounded-lg inline-flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+                >
+                  View Live Project <ExternalLink className="w-3.5 h-3.5" />
+                </a>
               </div>
             </div>
           </div>

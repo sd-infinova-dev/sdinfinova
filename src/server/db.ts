@@ -296,11 +296,11 @@ async function seedInitialData() {
         category: 'Photography & Portfolio',
         short_description: 'An editorial portfolio and photo client delivery gallery platform featuring ultra-fast image loading and dark studio aesthetics.',
         full_case_study: 'SD Tech Photograph required an editorial digital showcase to display high-resolution commercial and creative photography without sacrificing loading speeds on mobile connections in Nepal. We engineered an image-optimized gallery with progressive WebP loading, masonry layouts, custom lightboxes, and a private client proofing section where clients review and select proofs directly.',
-        cover_image: '/assets/aistudio/Screenshot_2026-10-17_122839_0fe2d1b9.png',
-        gallery_images: JSON.stringify(['/assets/aistudio/Screenshot_2026-10-17_122839_0fe2d1b9.png']),
+        cover_image: '/assets/projects/sd-tech-photograph.png',
+        gallery_images: JSON.stringify(['/assets/projects/sd-tech-photograph.png']),
         tech_stack: JSON.stringify(['React', 'TypeScript', 'Tailwind CSS', 'Vite', 'Cloudflare CDN']),
-        live_url: 'https://sdinfinova.com/work/sd-tech-photograph',
-        repo_url: 'https://github.com/sdinfinova/sd-tech-photograph',
+        live_url: 'https://sd-tech-photograph-ytpn.vercel.app/',
+        repo_url: '',
         client_name: 'SD Tech Photography Studio',
         completion_date: '2025',
         is_featured: true,
@@ -317,11 +317,11 @@ async function seedInitialData() {
         category: 'Healthcare & Clinic',
         short_description: 'Patient appointment scheduling portal, clinical service catalog, and doctor directory built for modern healthcare practices.',
         full_case_study: 'A premier dental clinic in Kathmandu required a trustworthy, patient-centric digital portal to handle appointment bookings, showcase clinical specialties (Orthodontics, Implants, Cosmetic Dentistry), and answer common patient queries. We designed a clean, calming interface with seamless WhatsApp direct booking, doctor credential profiles, and interactive service breakdowns.',
-        cover_image: '/assets/aistudio/image_ee582da3.png',
-        gallery_images: JSON.stringify(['/assets/aistudio/image_ee582da3.png']),
+        cover_image: '/assets/projects/dental-care.png',
+        gallery_images: JSON.stringify(['/assets/projects/dental-care.png']),
         tech_stack: JSON.stringify(['React', 'Node.js', 'Express', 'PostgreSQL', 'Tailwind CSS']),
-        live_url: 'https://sdinfinova.com/work/dental-care',
-        repo_url: 'https://github.com/sdinfinova/dental-care',
+        live_url: 'https://dental-rust-two.vercel.app/',
+        repo_url: '',
         client_name: 'Dental Care Healthcare Clinic',
         completion_date: '2025',
         is_featured: true,
@@ -334,15 +334,15 @@ async function seedInitialData() {
       {
         id: 'prj_3',
         slug: 'nepal-apparel-clothing-store',
-        title: 'Modern Apparel & Clothing Brand',
+        title: 'SD Infininov - Dashain Reloaded Festive Clothing',
         category: 'E-commerce & Retail',
         short_description: 'A boutique streetwear and contemporary apparel showcase featuring lookbooks, size charts, and direct Kathmandu order fulfillment.',
         full_case_study: 'Created for a growing Nepali clothing label looking to bridge the gap between social media marketing and structured digital ordering. We developed a fluid, mobile-first product catalog with dynamic filterable collections, detailed textile specifications, size guides, and one-click order placement via WhatsApp and bank transfer confirmation.',
-        cover_image: '/assets/aistudio/Screenshot_2026-10-17_122839_0fe2d1b9.png',
-        gallery_images: JSON.stringify(['/assets/aistudio/Screenshot_2026-10-17_122839_0fe2d1b9.png']),
+        cover_image: '/assets/projects/clothing-brand.png',
+        gallery_images: JSON.stringify(['/assets/projects/clothing-brand.png']),
         tech_stack: JSON.stringify(['React', 'TypeScript', 'Vite', 'PostgreSQL', 'Tailwind CSS']),
-        live_url: 'https://sdinfinova.com/work/clothing-website',
-        repo_url: 'https://github.com/sdinfinova/apparel-store',
+        live_url: 'https://sd-infininova.vercel.app/',
+        repo_url: '',
         client_name: 'Urban Heritage Apparel',
         completion_date: '2025',
         is_featured: true,
@@ -359,11 +359,11 @@ async function seedInitialData() {
         category: 'Custom Web Application',
         short_description: 'Comprehensive student hostel and accommodation directory platform with location filters, amenity comparisons, and direct landlord contact.',
         full_case_study: 'FindMyHostel connects students and young professionals across Kathmandu, Lalitpur, and Pokhara with verified hostels. Built with complex filtering (by college proximity, price per bed, Wi-Fi, food options), interactive maps, photo tours, and real-time room availability indicators.',
-        cover_image: '/assets/aistudio/image_ee582da3.png',
-        gallery_images: JSON.stringify(['/assets/aistudio/image_ee582da3.png']),
+        cover_image: '/assets/projects/findmyhostel.png',
+        gallery_images: JSON.stringify(['/assets/projects/findmyhostel.png']),
         tech_stack: JSON.stringify(['React', 'Node.js', 'PostgreSQL', 'Tailwind CSS', 'Map Integration']),
-        live_url: 'https://sdinfinova.com/work/find-my-hostel',
-        repo_url: 'https://github.com/sdinfinova/find-my-hostel',
+        live_url: 'https://findmyhostel.pythonanywhere.com/',
+        repo_url: '',
         client_name: 'FindMyHostel Nepal',
         completion_date: '2026',
         is_featured: true,
@@ -384,6 +384,34 @@ async function seedInitialData() {
     }
     console.log('[PostgreSQL] Seeded 4 verified studio projects.');
   }
+
+  // Ensure all projects point to authentic namespaced photos and live URLs, and remove repo_url
+  await pg.exec(`
+    UPDATE projects SET 
+      live_url = 'https://sd-tech-photograph-ytpn.vercel.app/',
+      repo_url = NULL,
+      cover_image = '/assets/projects/sd-tech-photograph.png'
+    WHERE slug = 'sd-tech-photograph' OR id = 'prj_1';
+
+    UPDATE projects SET 
+      live_url = 'https://dental-rust-two.vercel.app/',
+      repo_url = NULL,
+      cover_image = '/assets/projects/dental-care.png'
+    WHERE slug = 'dental-care-clinic-portal' OR id = 'prj_2';
+
+    UPDATE projects SET 
+      title = 'SD Infininov - Dashain Reloaded Festive Clothing',
+      live_url = 'https://sd-infininova.vercel.app/',
+      repo_url = NULL,
+      cover_image = '/assets/projects/clothing-brand.png'
+    WHERE slug = 'nepal-apparel-clothing-store' OR id = 'prj_3';
+
+    UPDATE projects SET 
+      live_url = 'https://findmyhostel.pythonanywhere.com/',
+      repo_url = NULL,
+      cover_image = '/assets/projects/findmyhostel.png'
+    WHERE slug = 'find-my-hostel-nepal' OR id = 'prj_4';
+  `);
 
   // 4. Seed Blog Posts
   const blogRes = await pg.query('SELECT COUNT(*) as count FROM blog_posts');

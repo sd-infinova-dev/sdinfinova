@@ -43,7 +43,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
             return (
               <div
                 key={pkg.id}
-                className={`rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 relative ${
+                className={`rounded-3xl p-5 sm:p-7 flex flex-col justify-between transition-all duration-300 relative ${
                   isRec
                     ? 'bg-[#13161e] border-2 border-[#d89f66] shadow-[0_0_35px_-8px_rgba(216,159,102,0.3)] lg:-translate-y-2'
                     : 'surface-card'

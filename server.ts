@@ -1,12 +1,15 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import helmet from 'helmet';
+import csurf from 'csurf';
+import rateLimit from 'express-rate-limit';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { initDatabase, pg } from './src/server/db';
-import { apiRouter } from './src/server/api';
+import { apiRouter, publicApiRouter } from './src/server/api';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,20 +21,66 @@ async function startServer() {
   const app = express();
 
   // Basic security and parsing middleware
-  app.use(cors({
-    origin: true,
+  // Restrictive CORS: allow only whitelisted origins defined in env (comma-separated). Fallback to same origin.
+  const whitelist = (process.env.CORS_WHITELIST || '').split(',').map(o => o.trim()).filter(Boolean);
+  const corsOptions = {
+    origin: (origin, callback) => {
+      // Allow requests without Origin (e.g., server-to-server, curl, Postman)
+      if (!origin) return callback(null, true);
+      // If whitelist is empty, allow all origins (development fallback)
+      if (whitelist.length === 0) return callback(null, true);
+      if (whitelist.includes(origin)) return callback(null, true);
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true
-  }));
+  } as const;
+  app.use(cors(corsOptions));
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(cookieParser());
+  // Rate limiter for authentication and inquiry endpoints
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // limit each IP to 5 requests per window
+    message: { error: 'Too many attempts, please try again later.' }
+  });
+  // Apply to login route (will be attached later)
+  // Apply to inquiry submission route (will be attached later)
+
 
   // Security Headers
-  app.use((_req, res, next) => {
+  // Security headers via Helmet (adds CSP, HSTS, etc.)
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        // 'unsafe-inline' required for:
+        //   - @vitejs/plugin-react HMR preamble (dev)
+        //   - <script type="application/ld+json"> (JSON-LD structured data)
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        // Google Fonts stylesheet must be explicitly allowed
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        imgSrc: ["'self'", "data:", "https:"],
+        // ws:// required for Vite HMR WebSocket in dev; wss:// for prod HMR
+        connectSrc: ["'self'", "ws:", "wss:"],
+        // fonts.gstatic.com serves the actual font files
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "https://fonts.googleapis.com"],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: []
+      }
+    },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+  }));
+  // Mount public API routes BEFORE csurf() so they are not blocked by CSRF.
+  // Only non-sensitive, public-facing POST endpoints live here.
+  app.use('/api/v1', publicApiRouter);
+
+  // CSRF protection for all subsequent routes (auth, admin, etc.)
+  app.use(csurf({ cookie: true }));
+app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     next();
   });
 
@@ -149,17 +198,28 @@ Sitemap: https://sdinfinova.com/sitemap.xml
   });
 
   // REST API Router
-  app.use('/api/v1', apiRouter);
+  app.use('/api/v1/auth/login', authLimiter);
+app.use('/api/v1', apiRouter);
 
   // Vite development integration or static production serving
-  if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa'
     });
     app.use(vite.middlewares);
+    // Fallback to index.html for SPA routes in dev mode
+    app.use('*', async (req, res) => {
+      try {
+        const url = req.originalUrl;
+        let html = await vite.transformIndexHtml(url, fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8'));
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
+      } catch (e) {
+        vite.ssrFixStacktrace(e);
+        console.error(e);
+        res.status(500).end(e.message);
+      }
+    });
     console.log('[Server] Vite middleware mounted in development mode.');
-  } else {
     const distPath = path.resolve(__dirname, 'dist');
     if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));
@@ -167,7 +227,7 @@ Sitemap: https://sdinfinova.com/sitemap.xml
         res.sendFile(path.resolve(distPath, 'index.html'));
       });
       console.log('[Server] Serving production static bundle from /dist');
-    }
+
   }
 
   app.listen(PORT, '0.0.0.0', () => {

@@ -93,11 +93,11 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ posts, loading }) => {
         {/* Full Article Modal */}
         {selectedPost && (
           <div
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
             onClick={() => setSelectedPost(null)}
           >
             <div
-              className="bg-[#101217] border border-white/[0.12] rounded-2xl max-w-2xl w-full p-6 sm:p-8 space-y-6 relative my-8 shadow-2xl"
+              className="bg-[#101217] border border-white/[0.12] rounded-2xl max-w-2xl w-full p-4 sm:p-7 lg:p-8 space-y-5 sm:space-y-6 relative my-4 sm:my-8 shadow-2xl max-h-[92vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Close Button */}

@@ -50,11 +50,11 @@ export const ProcessSection: React.FC = () => {
         </div>
 
         {/* Process Steps */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 sm:gap-6">
           {steps.map((step) => (
             <div
               key={step.num}
-              className="bg-[#101216] border border-white/[0.07] rounded-2xl p-6 flex flex-col justify-between hover:border-[#d89f66]/30 transition-colors"
+              className="bg-[#101216] border border-white/[0.07] rounded-2xl p-5 sm:p-6 flex flex-col justify-between hover:border-[#d89f66]/30 transition-colors"
             >
               <div>
                 <div className="font-mono text-2xl font-bold text-[#d89f66] mb-4">
