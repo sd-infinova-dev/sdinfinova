@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# PostgreSQL runtime data (auto-generated binary files, never commit)
+data/postgres/
+
+# User-uploaded files (runtime, excluded from source control)
+public/uploads/
