@@ -1,3 +1,4 @@
+
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sdinfinova",
@@ -11,12 +12,6 @@
       "binding": "DB",
       "database_name": "sdinfinova-db",
       "database_id": "aa781be1-bbbd-4cce-aba3-61f910e9b68d"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "MEDIA_BUCKET",
-      "bucket_name": "sdinfinova-media"
     }
   ]
 }
