@@ -9,15 +9,25 @@ import fs from 'fs';
 import nodemailer from 'nodemailer';
 
 export const apiRouter = Router();
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+})[char] as string);
 
 // Public routes that are exempt from CSRF protection.
-// Mount this router BEFORE csurf() middleware in server.ts.
+// Public routes are mounted before cookie-session CSRF validation in server.ts.
 export const publicApiRouter = Router();
 
 // Ensure upload directory exists
-const UPLOADS_DIR = path.resolve(process.cwd(), 'public/uploads');
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+export const UPLOADS_DIR = path.resolve(process.env.UPLOADS_DIR || path.join(process.cwd(), 'public/uploads'));
+export function initializeUploadsStorage() {
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.UPLOADS_DIR || !path.isAbsolute(process.env.UPLOADS_DIR) ||
+        !fs.existsSync(UPLOADS_DIR) || !fs.statSync(UPLOADS_DIR).isDirectory()) {
+      throw new Error('UPLOADS_DIR must be an absolute path to an existing persistent volume in production.');
+    }
+    return;
+  }
+  if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
 // Multer storage configuration with mime type and size restrictions
@@ -27,7 +37,7 @@ const storage = multer.diskStorage({
   },
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    const cleanExt = ['.jpg', '.jpeg', '.png', '.webp', '.svg', '.gif'].includes(ext) ? ext : '.jpg';
+    const cleanExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext) ? ext : '.jpg';
     const rand = crypto.randomBytes(8).toString('hex');
     cb(null, `asset_${Date.now()}_${rand}${cleanExt}`);
   }
@@ -35,21 +45,55 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 10 },
   fileFilter: (_req, file, cb) => {
-    const allowedMime = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml', 'image/gif'];
-    if (allowedMime.includes(file.mimetype)) {
+    const allowedTypes: Record<string, string> = {
+      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+      '.webp': 'image/webp', '.gif': 'image/gif'
+    };
+    const extension = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes[extension] === file.mimetype) {
       cb(null, true);
     } else {
-      cb(new Error('Only JPEG, PNG, WebP, SVG, and GIF images are allowed.'));
+      const error = new Error('Unsupported image type. Upload a JPEG, PNG, WebP, or GIF image.') as NodeJS.ErrnoException;
+      error.code = 'UNSUPPORTED_FILE_TYPE';
+      cb(error);
     }
   }
 });
 
+function hasValidImageSignature(filePath: string, mimeType: string): boolean {
+  const header = Buffer.alloc(12);
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const bytesRead = fs.readSync(fd, header, 0, header.length, 0);
+    const bytes = header.subarray(0, bytesRead);
+    if (mimeType === 'image/jpeg') return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    if (mimeType === 'image/png') return bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    if (mimeType === 'image/gif') return bytes.subarray(0, 6).toString('ascii').match(/^GIF8[79]a$/) !== null;
+    if (mimeType === 'image/webp') return bytes.length >= 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
+    return false;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function parsedJsonArray(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 // Middleware: Verify Admin Authentication
 export async function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : (req.cookies?.admin_token || req.headers['x-admin-token'] as string);
+  const token = req.cookies?.admin_token as string | undefined;
 
   if (!token) {
     res.status(401).json({ error: 'Unauthorized. Admin session required.' });
@@ -57,12 +101,13 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
   }
 
   try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const sessionRes = await pg.query(
-      `SELECT s.*, u.id as user_id, u.email, u.name, u.role 
+      `SELECT s.*, u.id as user_id, u.email, u.name, u.role, u.must_change_password
        FROM admin_sessions s
        JOIN admin_users u ON s.user_id = u.id
        WHERE s.token = $1 AND s.expires_at > CURRENT_TIMESTAMP`,
-      [token]
+      [tokenHash]
     );
 
     if (sessionRes.rows.length === 0) {
@@ -71,6 +116,14 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
     }
 
     const session = sessionRes.rows[0] as any;
+    if (session.must_change_password) {
+      res.status(403).json({ error: 'Administrator credential rotation is required before access.' });
+      return;
+    }
+    if (!['admin', 'superadmin'].includes(session.role)) {
+      res.status(403).json({ error: 'Administrator permission required.' });
+      return;
+    }
     (req as any).adminUser = {
       id: session.user_id,
       email: session.email,
@@ -92,7 +145,7 @@ async function logAdminAction(userId: string, userName: string, action: string, 
       [`log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`, userId, userName, action, targetType, targetId, JSON.stringify(details)]
     );
   } catch (e) {
-    console.error('Failed to write admin activity log:', e);
+    console.error('Failed to write administrative activity log.');
   }
 }
 
@@ -102,11 +155,10 @@ async function logAdminAction(userId: string, userName: string, action: string, 
 
 // Health Check
 apiRouter.get('/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    service: 'SD Infinova Core API v1',
-    database: 'PostgreSQL 16 (PGlite Persistent Engine)'
+  void pg.query('SELECT 1').then(() => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'SD Infinova Core API v1', database: 'reachable' });
+  }).catch(() => {
+    res.status(503).json({ status: 'unavailable', error: 'Database unavailable.' });
   });
 });
 
@@ -120,7 +172,8 @@ apiRouter.get('/settings', async (_req, res) => {
     }
     const row = result.rows[0] as any;
     const val = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
-    res.json(val);
+    const publicSettings = publicSettingsSchema.safeParse(val);
+    res.json(publicSettings.success ? publicSettings.data : {});
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to retrieve site settings.' });
   }
@@ -242,18 +295,86 @@ apiRouter.get('/blog/:slug', async (req, res) => {
 // Submit Contact Inquiry (Public with validation & rate protection)
 // NOTE: This route is registered on publicApiRouter (CSRF-exempt) because
 // it is called from the public-facing contact form without a CSRF token.
+const safeText = (max: number) => z.string().trim().max(max).refine((value) => !/[\u0000-\u001f\u007f]/.test(value), 'Control characters are not allowed');
+const isHttpUrl = (value: string) => {
+  try { return ['http:', 'https:'].includes(new URL(value).protocol); } catch { return false; }
+};
+const httpUrl = z.string().trim().url().max(2048).refine(isHttpUrl, 'Only HTTP and HTTPS URLs are allowed');
+const assetReference = safeText(2048).refine((value) => value.startsWith('/') ? !value.startsWith('//') : isHttpUrl(value), 'Invalid asset URL');
+const projectInputSchema = z.object({
+  slug: safeText(120).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
+  title: safeText(160).min(1),
+  category: safeText(100).optional().default('Business Website'),
+  short_description: safeText(800).optional().default(''),
+  full_case_study: safeText(15000).optional().default(''),
+  cover_image: assetReference.optional().default('/assets/projects/sd-tech-photograph.png'),
+  gallery_images: z.array(assetReference).max(30).optional().default([]),
+  tech_stack: z.array(safeText(80)).max(40).optional().default(['React', 'TypeScript', 'Tailwind CSS']),
+  live_url: z.union([httpUrl, z.literal('')]).optional().default(''),
+  repo_url: z.union([httpUrl, z.literal('')]).optional().default(''),
+  client_name: safeText(160).optional().default(''),
+  completion_date: safeText(32).optional().default(''),
+  is_featured: z.boolean().optional().default(false),
+  is_published: z.boolean().optional().default(true),
+  metrics: z.array(z.object({ label: safeText(100), value: safeText(100) })).max(30).optional().default([])
+});
+const projectPatchSchema = projectInputSchema.partial();
+const blogInputSchema = z.object({
+  slug: safeText(120).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
+  title: safeText(200).min(1),
+  excerpt: safeText(1000).optional().default(''),
+  content: safeText(30000).optional().default(''),
+  author: safeText(160).optional().default('SD Infinova Team'),
+  cover_image: assetReference.optional().default('/assets/projects/clothing-brand.png'),
+  category: safeText(100).optional().default('Web Engineering'),
+  tags: z.array(safeText(60)).max(40).optional().default([]),
+  reading_time_minutes: z.coerce.number().int().min(1).max(120).optional().default(5),
+  is_published: z.boolean().optional().default(true),
+  seo_title: safeText(200).optional().default(''),
+  seo_description: safeText(500).optional().default('')
+});
+const blogPatchSchema = blogInputSchema.partial();
+const generalSettingsSchema = z.object({
+  site_name: safeText(120).optional(),
+  tagline: safeText(200).optional(),
+  headline: safeText(240).optional(),
+  subheadline: safeText(1000).optional(),
+  contact_email: z.string().trim().email().max(254).optional(),
+  contact_phone: safeText(60).optional(),
+  whatsapp_number: safeText(40).optional(),
+  location: safeText(160).optional(),
+  operating_hours: safeText(200).optional(),
+  social_links: z.object({
+    github: z.union([httpUrl, z.literal('')]).optional(),
+    linkedin: z.union([httpUrl, z.literal('')]).optional(),
+    facebook: z.union([httpUrl, z.literal('')]).optional(),
+    instagram: z.union([httpUrl, z.literal('')]).optional()
+  }).optional(),
+  announcement_bar: z.object({
+    enabled: z.boolean(),
+    text: safeText(400),
+    link: z.union([safeText(2048).refine((value) => value.startsWith('#')), httpUrl])
+  }).optional(),
+  budget_options: z.array(safeText(160)).max(20).optional()
+}).strict();
+const publicSettingsSchema = generalSettingsSchema.strip();
 const inquirySchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  business_name: z.string().optional().default(''),
-  email: z.string().email('Please enter a valid email address'),
-  phone: z.string().optional().default(''),
-  location: z.string().optional().default('Nepal'),
-  project_type: z.string().min(1, 'Please select a project type'),
-  budget_range: z.string().min(1, 'Please select a budget range'),
-  expected_timeline: z.string().optional().default('Flexible'),
-  description: z.string().min(10, 'Project description must be at least 10 characters'),
+  name: safeText(120).min(2, 'Name must be at least 2 characters'),
+  business_name: safeText(160).optional().default(''),
+  email: z.string().trim().email('Please enter a valid email address').max(254).transform((value) => value.toLowerCase()),
+  phone: safeText(40).optional().default(''),
+  location: safeText(120).optional().default('Nepal'),
+  project_type: safeText(120).min(1, 'Please select a project type'),
+  budget_range: safeText(120).min(1, 'Please select a budget range'),
+  expected_timeline: safeText(120).optional().default('Flexible'),
+  description: safeText(5000).min(10, 'Project description must be at least 10 characters'),
   preferred_contact: z.enum(['email', 'phone', 'whatsapp']).default('email')
 });
+
+const inquiryUpdateSchema = z.object({
+  status: z.enum(['new', 'contacted', 'qualified', 'won', 'lost']).optional(),
+  internal_notes: safeText(10000).optional()
+}).refine((data) => data.status !== undefined || data.internal_notes !== undefined, 'At least one field is required');
 
 publicApiRouter.post('/inquiries', async (req, res) => {
   try {
@@ -355,18 +476,18 @@ publicApiRouter.post('/inquiries', async (req, res) => {
             <div style="font-family: sans-serif; background: #0c0d10; color: #f1f2f4; padding: 24px; border-radius: 12px; max-width: 600px;">
               <h2 style="color: #d89f66; margin-top: 0;">New Project Inquiry Received</h2>
               <table style="width: 100%; border-collapse: collapse; margin: 16px 0; color: #e5e7eb; font-size: 14px;">
-                <tr><td style="padding: 6px 0; color: #9ca3af;">Client:</td><td><strong>${data.name}</strong></td></tr>
-                <tr><td style="padding: 6px 0; color: #9ca3af;">Business:</td><td>${data.business_name || 'Individual'}</td></tr>
-                <tr><td style="padding: 6px 0; color: #9ca3af;">Email:</td><td><a href="mailto:${data.email}" style="color: #d89f66;">${data.email}</a></td></tr>
-                <tr><td style="padding: 6px 0; color: #9ca3af;">Phone / WhatsApp:</td><td>${data.phone || 'N/A'}</td></tr>
-                <tr><td style="padding: 6px 0; color: #9ca3af;">Preferred Contact:</td><td><strong style="color: #4ade80;">${data.preferred_contact.toUpperCase()}</strong></td></tr>
-                <tr><td style="padding: 6px 0; color: #9ca3af;">Package:</td><td>${data.project_type}</td></tr>
-                <tr><td style="padding: 6px 0; color: #9ca3af;">Budget:</td><td style="color: #d89f66; font-family: monospace;">${data.budget_range}</td></tr>
-                <tr><td style="padding: 6px 0; color: #9ca3af;">Timeline:</td><td>${data.expected_timeline}</td></tr>
+                <tr><td style="padding: 6px 0; color: #9ca3af;">Client:</td><td><strong>${escapeHtml(data.name)}</strong></td></tr>
+                <tr><td style="padding: 6px 0; color: #9ca3af;">Business:</td><td>${escapeHtml(data.business_name || 'Individual')}</td></tr>
+                <tr><td style="padding: 6px 0; color: #9ca3af;">Email:</td><td><a href="mailto:${escapeHtml(data.email)}" style="color: #d89f66;">${escapeHtml(data.email)}</a></td></tr>
+                <tr><td style="padding: 6px 0; color: #9ca3af;">Phone / WhatsApp:</td><td>${escapeHtml(data.phone || 'N/A')}</td></tr>
+                <tr><td style="padding: 6px 0; color: #9ca3af;">Preferred Contact:</td><td><strong style="color: #4ade80;">${escapeHtml(data.preferred_contact.toUpperCase())}</strong></td></tr>
+                <tr><td style="padding: 6px 0; color: #9ca3af;">Package:</td><td>${escapeHtml(data.project_type)}</td></tr>
+                <tr><td style="padding: 6px 0; color: #9ca3af;">Budget:</td><td style="color: #d89f66; font-family: monospace;">${escapeHtml(data.budget_range)}</td></tr>
+                <tr><td style="padding: 6px 0; color: #9ca3af;">Timeline:</td><td>${escapeHtml(data.expected_timeline)}</td></tr>
               </table>
               <div style="background: #171a22; padding: 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); margin: 16px 0;">
                 <div style="color: #9ca3af; font-size: 12px; text-transform: uppercase; margin-bottom: 8px;">Description:</div>
-                <div style="white-space: pre-wrap; font-size: 14px; line-height: 1.6;">${data.description}</div>
+                <div style="white-space: pre-wrap; font-size: 14px; line-height: 1.6;">${escapeHtml(data.description)}</div>
               </div>
               <div style="margin-top: 20px; font-size: 12px; color: #6b7280;">Inquiry ID: ${id}</div>
             </div>
@@ -374,7 +495,7 @@ publicApiRouter.post('/inquiries', async (req, res) => {
         });
         emailDispatched = true;
       } catch (mailErr) {
-        console.error('SMTP automated email dispatch error:', mailErr);
+        console.error('Inquiry notification delivery failed.');
       }
     }
 
@@ -390,7 +511,7 @@ publicApiRouter.post('/inquiries', async (req, res) => {
       message: 'Thank you! Your project inquiry has been received. Our engineering lead will review your requirements and respond within 24 business hours.'
     });
   } catch (err: any) {
-    console.error('Inquiry submission error:', err);
+    console.error('Inquiry submission failed before confirmation.');
     res.status(500).json({ error: 'Server error processing your inquiry. Please try again or reach out on WhatsApp.' });
   }
 });
@@ -401,9 +522,20 @@ publicApiRouter.post('/inquiries', async (req, res) => {
 publicApiRouter.post('/analytics/pageview', async (req, res) => {
   try {
     const { path: pagePath, referrer } = req.body;
-    if (!pagePath || pagePath.startsWith('/admin')) {
+    if (typeof pagePath !== 'string' || !pagePath.startsWith('/') || pagePath.length > 1000 ||
+        pagePath.startsWith('/admin') || pagePath.startsWith('/api/') || pagePath.includes('#admin')) {
       res.json({ recorded: false });
       return;
+    }
+
+    let sanitizedReferrer = '';
+    if (typeof referrer === 'string') {
+      try {
+        const parsedReferrer = new URL(referrer);
+        sanitizedReferrer = `${parsedReferrer.origin}${parsedReferrer.pathname}`.slice(0, 500);
+      } catch {
+        sanitizedReferrer = '';
+      }
     }
 
     const today = new Date().toISOString().split('T')[0];
@@ -413,7 +545,7 @@ publicApiRouter.post('/analytics/pageview', async (req, res) => {
     await pg.query(
       `INSERT INTO page_views (id, path, referrer, user_agent, date_str)
        VALUES ($1, $2, $3, $4, $5)`,
-      [id, pagePath, (referrer || 'direct').substring(0, 100), userAgent, today]
+      [id, pagePath, sanitizedReferrer || 'direct', userAgent, today]
     );
 
     res.json({ recorded: true });
@@ -428,11 +560,15 @@ publicApiRouter.post('/analytics/pageview', async (req, res) => {
 
 apiRouter.post('/auth/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
+    const credentials = z.object({
+      email: z.string().trim().email().max(254),
+      password: z.string().min(1).max(1024)
+    }).safeParse(req.body);
+    if (!credentials.success) {
       res.status(400).json({ error: 'Email and password are required.' });
       return;
     }
+    const { email, password } = credentials.data;
 
     const userRes = await pg.query('SELECT * FROM admin_users WHERE email = $1', [email.toLowerCase().trim()]);
     if (userRes.rows.length === 0) {
@@ -447,14 +583,15 @@ apiRouter.post('/auth/login', async (req, res) => {
       return;
     }
 
-    // Create session token (valid for 7 days)
-    const token = `adm_tok_${crypto.randomBytes(32).toString('hex')}`;
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // Create an opaque, database-backed cookie session (valid for 8 hours).
+    const token = crypto.randomBytes(32).toString('base64url');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
 
     await pg.query(
       `INSERT INTO admin_sessions (id, user_id, token, expires_at)
        VALUES ($1, $2, $3, $4)`,
-      [`ses_${Date.now()}`, user.id, token, expiresAt]
+      [`ses_${crypto.randomUUID()}`, user.id, tokenHash, expiresAt]
     );
 
     await logAdminAction(user.id, user.name, 'LOGIN', 'auth', user.id, { email: user.email });
@@ -463,12 +600,12 @@ apiRouter.post('/auth/login', async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000
+      path: '/',
+      maxAge: 8 * 60 * 60 * 1000
     });
 
     res.json({
       success: true,
-      token,
       user: {
         id: user.id,
         email: user.email,
@@ -477,9 +614,25 @@ apiRouter.post('/auth/login', async (req, res) => {
       }
     });
   } catch (err: any) {
-    console.error('Login error:', err);
+    console.error('Administrator login request failed.');
     res.status(500).json({ error: 'Internal server error during authentication.' });
   }
+});
+
+apiRouter.get('/auth/csrf-token', (req, res) => {
+  let csrfToken = req.cookies?._csrf as string | undefined;
+  if (!csrfToken || !/^[A-Za-z0-9_-]{43}$/.test(csrfToken)) {
+    csrfToken = crypto.randomBytes(32).toString('base64url');
+  }
+  res.cookie('_csrf', csrfToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/v1',
+    maxAge: 8 * 60 * 60 * 1000
+  });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ csrfToken });
 });
 
 apiRouter.get('/auth/me', requireAdmin, (req, res) => {
@@ -490,14 +643,19 @@ apiRouter.get('/auth/me', requireAdmin, (req, res) => {
 
 apiRouter.post('/auth/logout', requireAdmin, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : (req.cookies?.admin_token || req.headers['x-admin-token'] as string);
+    const token = req.cookies?.admin_token as string | undefined;
 
     if (token) {
-      await pg.query('DELETE FROM admin_sessions WHERE token = $1', [token]);
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      await pg.query('DELETE FROM admin_sessions WHERE token = $1', [tokenHash]);
     }
 
-    res.clearCookie('admin_token');
+    res.clearCookie('admin_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/'
+    });
     res.json({ success: true, message: 'Logged out successfully.' });
   } catch (err: any) {
     res.status(500).json({ error: 'Logout failed.' });
@@ -506,11 +664,15 @@ apiRouter.post('/auth/logout', requireAdmin, async (req, res) => {
 
 apiRouter.put('/auth/password', requireAdmin, async (req, res) => {
   try {
-    const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword || newPassword.length < 8) {
-      res.status(400).json({ error: 'New password must be at least 8 characters long.' });
+    const passwordChange = z.object({
+      currentPassword: z.string().min(1).max(1024),
+      newPassword: z.string().min(16).max(1024)
+    }).safeParse(req.body);
+    if (!passwordChange.success) {
+      res.status(400).json({ error: 'New password must be at least 16 characters long.' });
       return;
     }
+    const { currentPassword, newPassword } = passwordChange.data;
 
     const userId = (req as any).adminUser.id;
     const userRes = await pg.query('SELECT * FROM admin_users WHERE id = $1', [userId]);
@@ -522,11 +684,17 @@ apiRouter.put('/auth/password', requireAdmin, async (req, res) => {
       return;
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const newHash = await bcrypt.hash(newPassword, salt);
+    const newHash = await bcrypt.hash(newPassword, 12);
     await pg.query('UPDATE admin_users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [newHash, userId]);
+    await pg.query('DELETE FROM admin_sessions WHERE user_id = $1', [userId]);
 
     await logAdminAction(userId, user.name, 'PASSWORD_CHANGE', 'user', userId);
+    res.clearCookie('admin_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/'
+    });
     res.json({ success: true, message: 'Password updated successfully.' });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to update password.' });
@@ -637,7 +805,12 @@ apiRouter.get('/admin/inquiries', requireAdmin, async (req, res) => {
 apiRouter.put('/admin/inquiries/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, internal_notes } = req.body;
+    const parsed = inquiryUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid inquiry update.' });
+      return;
+    }
+    const { status, internal_notes } = parsed.data;
     const admin = (req as any).adminUser;
 
     await pg.query(
@@ -649,7 +822,7 @@ apiRouter.put('/admin/inquiries/:id', requireAdmin, async (req, res) => {
       [status, internal_notes, id]
     );
 
-    await logAdminAction(admin.id, admin.name, 'UPDATE_INQUIRY', 'inquiry', id, { status, internal_notes });
+    await logAdminAction(admin.id, admin.name, 'UPDATE_INQUIRY', 'inquiry', id, { status, notes_updated: internal_notes !== undefined });
     res.json({ success: true, message: 'Inquiry updated successfully.' });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to update inquiry.' });
@@ -674,7 +847,11 @@ apiRouter.get('/admin/inquiries/export/csv', requireAdmin, async (_req, res) => 
     const result = await pg.query('SELECT * FROM contact_inquiries ORDER BY created_at DESC');
     let csv = 'ID,Name,Business,Email,Phone,Location,ProjectType,Budget,Timeline,PreferredContact,Status,Date\n';
     for (const r of (result.rows as any[])) {
-      const clean = (val: any) => `"${String(val || '').replace(/"/g, '""')}"`;
+      const clean = (val: unknown) => {
+        let value = String(val || '');
+        if (/^[\u0000-\u0020]*[=+\-@]/.test(value)) value = `'${value}`;
+        return `"${value.replace(/"/g, '""')}"`;
+      };
       csv += `${clean(r.id)},${clean(r.name)},${clean(r.business_name)},${clean(r.email)},${clean(r.phone)},${clean(r.location)},${clean(r.project_type)},${clean(r.budget_range)},${clean(r.expected_timeline)},${clean(r.preferred_contact)},${clean(r.status)},${clean(r.created_at)}\n`;
     }
     res.setHeader('Content-Type', 'text/csv');
@@ -704,7 +881,12 @@ apiRouter.get('/admin/projects', requireAdmin, async (_req, res) => {
 apiRouter.post('/admin/projects', requireAdmin, async (req, res) => {
   try {
     const admin = (req as any).adminUser;
-    const p = req.body;
+    const parsed = projectInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid project data.' });
+      return;
+    }
+    const p = parsed.data;
     const id = `prj_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
     const slug = (p.slug || p.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
 
@@ -737,7 +919,7 @@ apiRouter.post('/admin/projects', requireAdmin, async (req, res) => {
     await logAdminAction(admin.id, admin.name, 'CREATE_PROJECT', 'project', id, { title: p.title });
     res.status(201).json({ success: true, id, message: 'Project created successfully.' });
   } catch (err: any) {
-    console.error('Project create error:', err);
+    console.error('Project creation failed.');
     res.status(500).json({ error: 'Failed to create project. Slug must be unique.' });
   }
 });
@@ -746,7 +928,12 @@ apiRouter.put('/admin/projects/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const admin = (req as any).adminUser;
-    const p = req.body;
+    const parsed = projectPatchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid project data.' });
+      return;
+    }
+    const p = parsed.data;
 
     const existingRes = await pg.query('SELECT * FROM projects WHERE id = $1', [id]);
     if (existingRes.rows.length === 0) {
@@ -763,13 +950,8 @@ apiRouter.put('/admin/projects/:id', requireAdmin, async (req, res) => {
     const cover_image = p.cover_image !== undefined ? String(p.cover_image) : existing.cover_image;
     
     // Parse arrays safely
-    const gallery_images = Array.isArray(p.gallery_images) 
-      ? JSON.stringify(p.gallery_images) 
-      : (typeof p.gallery_images === 'string' ? p.gallery_images : (typeof existing.gallery_images === 'string' ? existing.gallery_images : JSON.stringify(existing.gallery_images || [])));
-      
-    const tech_stack = Array.isArray(p.tech_stack) 
-      ? JSON.stringify(p.tech_stack) 
-      : (typeof p.tech_stack === 'string' ? JSON.stringify(p.tech_stack.split(',').map((s: string) => s.trim()).filter(Boolean)) : (typeof existing.tech_stack === 'string' ? existing.tech_stack : JSON.stringify(existing.tech_stack || [])));
+    const gallery_images = JSON.stringify(p.gallery_images ?? parsedJsonArray(existing.gallery_images));
+    const tech_stack = JSON.stringify(p.tech_stack ?? parsedJsonArray(existing.tech_stack));
 
     const live_url = p.live_url !== undefined 
       ? (p.live_url && String(p.live_url).trim() ? String(p.live_url).trim() : null) 
@@ -784,9 +966,7 @@ apiRouter.put('/admin/projects/:id', requireAdmin, async (req, res) => {
     const is_featured = p.is_featured !== undefined ? Boolean(p.is_featured) : Boolean(existing.is_featured);
     const is_published = p.is_published !== undefined ? Boolean(p.is_published) : Boolean(existing.is_published);
     
-    const metrics = Array.isArray(p.metrics)
-      ? JSON.stringify(p.metrics)
-      : (typeof p.metrics === 'string' ? p.metrics : (typeof existing.metrics === 'string' ? existing.metrics : JSON.stringify(existing.metrics || [])));
+    const metrics = JSON.stringify(p.metrics ?? parsedJsonArray(existing.metrics));
 
     await pg.query(
       `UPDATE projects SET
@@ -830,8 +1010,8 @@ apiRouter.put('/admin/projects/:id', requireAdmin, async (req, res) => {
     await logAdminAction(admin.id, admin.name, 'UPDATE_PROJECT', 'project', id, { title });
     res.json({ success: true, message: 'Project updated successfully.' });
   } catch (err: any) {
-    console.error('Project update error:', err);
-    res.status(500).json({ error: err?.message || 'Failed to update project.' });
+    console.error('Project update failed.');
+    res.status(500).json({ error: 'Failed to update project.' });
   }
 });
 
@@ -849,7 +1029,7 @@ apiRouter.delete('/admin/projects/:id', requireAdmin, async (req, res) => {
     await logAdminAction(admin.id, admin.name, 'DELETE_PROJECT', 'project', id, { title: projectTitle });
     res.json({ success: true, message: 'Project deleted successfully.' });
   } catch (err: any) {
-    console.error('Project delete error:', err);
+    console.error('Project deletion failed.');
     res.status(500).json({ error: 'Failed to delete project.' });
   }
 });
@@ -871,7 +1051,12 @@ apiRouter.get('/admin/blog', requireAdmin, async (_req, res) => {
 apiRouter.post('/admin/blog', requireAdmin, async (req, res) => {
   try {
     const admin = (req as any).adminUser;
-    const b = req.body;
+    const parsed = blogInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid article data.' });
+      return;
+    }
+    const b = parsed.data;
     const id = `pst_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
     const slug = (b.slug || b.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
 
@@ -891,8 +1076,8 @@ apiRouter.post('/admin/blog', requireAdmin, async (req, res) => {
         b.cover_image || '/assets/projects/clothing-brand.png',
         b.category || 'Web Engineering',
         JSON.stringify(b.tags || ['Nepal', 'Engineering']),
-        parseInt(b.reading_time_minutes || '5', 10),
-        b.is_published !== false,
+        b.reading_time_minutes,
+        b.is_published,
         b.seo_title || b.title,
         b.seo_description || b.excerpt
       ]
@@ -909,7 +1094,17 @@ apiRouter.put('/admin/blog/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const admin = (req as any).adminUser;
-    const b = req.body;
+    const parsed = blogPatchSchema.safeParse(req.body);
+    if (!parsed.success || Object.keys(parsed.data || {}).length === 0) {
+      res.status(400).json({ error: 'Invalid article data.' });
+      return;
+    }
+    const existingRes = await pg.query('SELECT * FROM blog_posts WHERE id = $1', [id]);
+    if (existingRes.rows.length === 0) {
+      res.status(404).json({ error: 'Article not found.' });
+      return;
+    }
+    const b = { ...(existingRes.rows[0] as Record<string, unknown>), ...parsed.data } as Record<string, any>;
 
     await pg.query(
       `UPDATE blog_posts SET
@@ -936,8 +1131,8 @@ apiRouter.put('/admin/blog/:id', requireAdmin, async (req, res) => {
         b.cover_image,
         b.category,
         JSON.stringify(b.tags || []),
-        parseInt(b.reading_time_minutes || '5', 10),
-        b.is_published,
+        Number(b.reading_time_minutes || 5),
+        Boolean(b.is_published),
         b.seo_title,
         b.seo_description,
         id
@@ -971,15 +1166,24 @@ apiRouter.post('/admin/media/upload', requireAdmin, upload.single('file') as any
       return;
     }
 
+    if (!hasValidImageSignature(req.file.path, req.file.mimetype)) {
+      fs.unlinkSync(req.file.path);
+      res.status(400).json({ error: 'The uploaded file is not a supported image.' });
+      return;
+    }
+
     const admin = (req as any).adminUser;
     const id = `med_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
     const url = `/uploads/${req.file.filename}`;
-    const altText = req.body.alt_text || req.file.originalname;
+    const originalName = path.basename(req.file.originalname).replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 255);
+    const altText = typeof req.body.alt_text === 'string'
+      ? req.body.alt_text.trim().replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 500)
+      : originalName;
 
     await pg.query(
       `INSERT INTO media_assets (id, filename, original_name, mime_type, file_size, url, alt_text)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [id, req.file.filename, req.file.originalname, req.file.mimetype, req.file.size, url, altText]
+      [id, req.file.filename, originalName, req.file.mimetype, req.file.size, url, altText]
     );
 
     await logAdminAction(admin.id, admin.name, 'UPLOAD_MEDIA', 'media', id, { filename: req.file.filename });
@@ -994,7 +1198,8 @@ apiRouter.post('/admin/media/upload', requireAdmin, upload.single('file') as any
       }
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'File upload failed.' });
+    if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    res.status(500).json({ error: 'File upload failed.' });
   }
 });
 
@@ -1014,6 +1219,10 @@ apiRouter.delete('/admin/media/:id', requireAdmin, async (req, res) => {
     const fileRes = await pg.query('SELECT filename FROM media_assets WHERE id = $1', [id]);
     if (fileRes.rows.length > 0) {
       const filename = (fileRes.rows[0] as any).filename;
+      if (path.basename(filename) !== filename) {
+        res.status(400).json({ error: 'Invalid media record.' });
+        return;
+      }
       const filePath = path.join(UPLOADS_DIR, filename);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
@@ -1031,7 +1240,12 @@ apiRouter.delete('/admin/media/:id', requireAdmin, async (req, res) => {
 apiRouter.put('/admin/settings', requireAdmin, async (req, res) => {
   try {
     const admin = (req as any).adminUser;
-    const newSettings = req.body;
+    const parsed = generalSettingsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid site settings.' });
+      return;
+    }
+    const newSettings = parsed.data;
 
     await pg.query(
       `INSERT INTO site_settings (key, value, updated_at) 

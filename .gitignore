@@ -12,3 +12,6 @@ data/postgres/
 
 # User-uploaded files (runtime, excluded from source control)
 public/uploads/
+
+# Cloudflare Wrangler local state & cache
+.wrangler/

@@ -81,9 +81,9 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ posts, loading }) => {
                   <span className="flex items-center gap-1.5 text-[#9ca3af]">
                     <User className="w-3 h-3 text-[#d89f66]" /> {post.author}
                   </span>
-                  <span className="text-[#d89f66] group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5 font-medium">
+                  <a href={`/blog/${encodeURIComponent(post.slug)}`} onClick={(event) => event.stopPropagation()} className="text-[#d89f66] group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5 font-medium">
                     Read article <ArrowUpRight className="w-3 h-3" />
-                  </span>
+                  </a>
                 </div>
               </article>
             ))}

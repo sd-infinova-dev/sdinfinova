@@ -18,11 +18,11 @@ import {
   AlertCircle,
   Clock,
   Layers,
-  KeyRound,
   Eye,
   EyeOff
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
+import { apiFetch } from '../lib/api';
 
 interface AdminDashboardProps {
   onClose: () => void;
@@ -31,10 +31,10 @@ interface AdminDashboardProps {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataChanged }) => {
   // Auth state
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('sd_admin_token'));
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminUser, setAdminUser] = useState<any>(null);
-  const [loginEmail, setLoginEmail] = useState('admin@sdinfinova.com');
-  const [loginPassword, setLoginPassword] = useState('InfinovaAdmin2026!');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -79,31 +79,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataC
 
   // Check auth on mount
   useEffect(() => {
-    if (token) {
-      verifySession();
-    }
-  }, [token]);
+    void verifySession();
+  }, []);
 
   // Load active tab data
   useEffect(() => {
-    if (token) {
-      loadTabData();
+    if (isAuthenticated) {
+      void loadTabData();
     }
-  }, [token, activeTab]);
+  }, [isAuthenticated, activeTab]);
 
   const verifySession = async () => {
     try {
-      const res = await fetch('/api/v1/auth/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await apiFetch('/api/v1/auth/me');
       if (res.ok) {
         const data = await res.json();
         setAdminUser(data.user);
+        setIsAuthenticated(true);
       } else {
-        handleLogout();
+        setAdminUser(null);
+        setIsAuthenticated(false);
       }
     } catch {
-      handleLogout();
+      setAdminUser(null);
+      setIsAuthenticated(false);
     }
   };
 
@@ -113,7 +112,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataC
     setLoginLoading(true);
 
     try {
-      const res = await fetch('/api/v1/auth/login', {
+      const res = await apiFetch('/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginEmail, password: loginPassword })
@@ -125,8 +124,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataC
         throw new Error(data.error || 'Authentication failed');
       }
 
-      localStorage.setItem('sd_admin_token', data.token);
-      setToken(data.token);
+      setIsAuthenticated(true);
       setAdminUser(data.user);
       setStatusMessage('Signed in successfully.');
     } catch (err: any) {
@@ -137,47 +135,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataC
   };
 
   const handleLogout = async () => {
-    if (token) {
-      try {
-        await fetch('/api/v1/auth/logout', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      } catch {}
-    }
-    localStorage.removeItem('sd_admin_token');
-    setToken(null);
+    try {
+      await apiFetch('/api/v1/auth/logout', { method: 'POST' });
+    } catch {}
+    setIsAuthenticated(false);
     setAdminUser(null);
   };
 
   const loadTabData = async () => {
     setLoadingData(true);
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-
       if (activeTab === 'analytics') {
-        const res = await fetch('/api/v1/admin/analytics', { headers });
+        const res = await apiFetch('/api/v1/admin/analytics');
         if (res.ok) setAnalyticsData(await res.json());
       } else if (activeTab === 'inquiries') {
-        const res = await fetch('/api/v1/admin/inquiries', { headers });
+        const res = await apiFetch('/api/v1/admin/inquiries');
         if (res.ok) setInquiries(await res.json());
       } else if (activeTab === 'projects') {
-        const res = await fetch('/api/v1/admin/projects', { headers });
+        const res = await apiFetch('/api/v1/admin/projects');
         if (res.ok) setProjects(await res.json());
       } else if (activeTab === 'blog') {
-        const res = await fetch('/api/v1/admin/blog', { headers });
+        const res = await apiFetch('/api/v1/admin/blog');
         if (res.ok) setBlogPosts(await res.json());
       } else if (activeTab === 'services') {
-        const res = await fetch('/api/v1/services');
+        const res = await apiFetch('/api/v1/services');
         if (res.ok) setServices(await res.json());
       } else if (activeTab === 'media') {
-        const res = await fetch('/api/v1/admin/media', { headers });
+        const res = await apiFetch('/api/v1/admin/media');
         if (res.ok) setMediaAssets(await res.json());
       } else if (activeTab === 'settings') {
-        const res = await fetch('/api/v1/settings');
+        const res = await apiFetch('/api/v1/settings');
         if (res.ok) setSiteSettings(await res.json());
       } else if (activeTab === 'logs') {
-        const res = await fetch('/api/v1/admin/activity', { headers });
+        const res = await apiFetch('/api/v1/admin/activity');
         if (res.ok) setActivityLogs(await res.json());
       }
     } catch (e) {
@@ -190,11 +180,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataC
   // Inquiry update
   const handleUpdateInquiryStatus = async (id: string, newStatus: string, notes?: string) => {
     try {
-      const res = await fetch(`/api/v1/admin/inquiries/${id}`, {
+      const res = await apiFetch(`/api/v1/admin/inquiries/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ status: newStatus, internal_notes: notes })
       });
@@ -243,9 +232,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataC
       else if (deleteTarget.type === 'blog') url = `/api/v1/admin/blog/${deleteTarget.id}`;
       else if (deleteTarget.type === 'inquiry') url = `/api/v1/admin/inquiries/${deleteTarget.id}`;
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
       });
 
       if (res.ok) {
@@ -294,11 +282,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataC
         slug: (editingProject.slug && editingProject.slug.trim()) || editingProject.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
       };
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(payload)
       });
@@ -333,11 +320,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataC
       const url = isNew ? '/api/v1/admin/blog' : `/api/v1/admin/blog/${editingPost.id}`;
       const method = isNew ? 'POST' : 'PUT';
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(editingPost)
       });
@@ -364,11 +350,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataC
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/v1/admin/settings', {
+      const res = await apiFetch('/api/v1/admin/settings', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(siteSettings)
       });
@@ -389,9 +374,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataC
     formData.append('alt_text', file.name);
 
     try {
-      const res = await fetch('/api/v1/admin/media/upload', {
+      const res = await apiFetch('/api/v1/admin/media/upload', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
         body: formData
       });
       if (res.ok) {
@@ -409,7 +393,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataC
   // -------------------------------------------------------------
   // RENDER: LOGIN SCREEN (If not authenticated)
   // -------------------------------------------------------------
-  if (!token || !adminUser) {
+  if (!isAuthenticated || !adminUser) {
     return (
       <div className="fixed inset-0 z-50 bg-[#090a0c] flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-[#111317] border border-white/[0.1] rounded-3xl p-8 space-y-6 shadow-2xl relative">
@@ -421,19 +405,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onDataC
             <p className="text-xs text-[#9ca3af]">
               Authenticate to manage CMS projects, client inquiries, and analytics.
             </p>
-          </div>
-
-          {/* Quick Demo Credentials Helper Callout */}
-          <div className="p-3.5 rounded-xl bg-[#181b22] border border-[#d89f66]/30 text-xs text-[#d1d5db] space-y-1">
-            <div className="font-semibold text-[#d89f66] flex items-center gap-1">
-              <KeyRound className="w-3.5 h-3.5" /> Initial Administrator Credentials:
-            </div>
-            <div className="font-mono text-[11px] text-[#9ca3af]">
-              Email: <span className="text-white">admin@sdinfinova.com</span>
-            </div>
-            <div className="font-mono text-[11px] text-[#9ca3af]">
-              Password: <span className="text-white">InfinovaAdmin2026!</span>
-            </div>
           </div>
 
           {loginError && (

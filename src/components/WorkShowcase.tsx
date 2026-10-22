@@ -198,9 +198,9 @@ export const WorkShowcase: React.FC<WorkShowcaseProps> = ({ projects, loading })
 
                   {/* Card Action Footer */}
                   <div className="px-6 pb-6 pt-2 flex items-center justify-between border-t border-white/[0.04]">
-                    <span className="text-xs text-[#9ca3af] font-medium group-hover:text-white transition-colors">
+                    <a href={`/work/${encodeURIComponent(project.slug)}`} onClick={(event) => event.stopPropagation()} className="text-xs text-[#9ca3af] font-medium group-hover:text-white transition-colors">
                       Case Study &amp; Architecture →
-                    </span>
+                    </a>
                     {liveUrl && (
                       <a
                         href={liveUrl}

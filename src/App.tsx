@@ -48,6 +48,11 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  useEffect(() => {
+    const robots = document.querySelector('meta[name="robots"]');
+    if (robots) robots.setAttribute('content', showAdmin ? 'noindex, nofollow, noarchive' : 'index, follow');
+  }, [showAdmin]);
+
   const loadPublicData = async () => {
     setLoading(true);
     try {
@@ -70,6 +75,7 @@ export default function App() {
   };
 
   const recordPageView = async () => {
+    if (window.location.pathname.startsWith('/admin') || window.location.hash === '#admin') return;
     try {
       await fetch('/api/v1/analytics/pageview', {
         method: 'POST',
@@ -85,12 +91,14 @@ export default function App() {
   const scrollToSection = (id: string) => {
     setActiveSection(id);
     if (id === 'hero') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+      window.scrollTo({ top: 0, behavior });
       return;
     }
     const elem = document.getElementById(id);
     if (elem) {
-      elem.scrollIntoView({ behavior: 'smooth' });
+      const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+      elem.scrollIntoView({ behavior });
     }
   };
 

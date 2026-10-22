@@ -135,6 +135,10 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                   </button>
 
+                  <a href={`/services/${encodeURIComponent(service.slug)}`} className="text-xs font-medium text-[#9ca3af] hover:text-[#f1f2f4] transition-colors">
+                    Service details
+                  </a>
+
                   <button
                     onClick={() => onStartInquiryWithService && onStartInquiryWithService(service.title)}
                     className="text-xs font-semibold text-[#d89f66] hover:text-[#eec397] flex items-center gap-1 cursor-pointer transition-colors"

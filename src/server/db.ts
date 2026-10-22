@@ -1,36 +1,121 @@
 import { PGlite } from '@electric-sql/pglite';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 
-// Persistent data directory for PostgreSQL
-const DATA_DIR = path.resolve(process.cwd(), 'data/postgres');
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const isProduction = process.env.NODE_ENV === 'production';
+const isTest = process.env.NODE_ENV === 'test' || (!isProduction && process.env.PGLITE_IN_MEMORY === 'true');
+const configuredDataDir = process.env.PGLITE_DATA_DIR;
+const DATA_DIR = path.resolve(configuredDataDir || path.join(__dirname, '../../data/postgres'));
+let pgInstance: PGlite | undefined;
 
-// Remove stale postmaster.pid lock file if server previously stopped ungracefully
-const pidFile = path.join(DATA_DIR, 'postmaster.pid');
-if (fs.existsSync(pidFile)) {
+// A lazy proxy preserves the existing query API without opening/creating storage
+// as a side effect of importing this module.
+export const pg = new Proxy({} as PGlite, {
+  get(_target, property) {
+    if (!pgInstance) throw new Error('Database is not initialized. Call initDatabase() after validating configuration.');
+    const value = Reflect.get(pgInstance, property, pgInstance) as unknown;
+    return typeof value === 'function' ? value.bind(pgInstance) : value;
+  }
+});
+
+function initializePGlite() {
+  if (pgInstance) return;
+  if (isTest) {
+    pgInstance = new PGlite();
+    return;
+  }
+  if (isProduction) {
+    if (!configuredDataDir || !path.isAbsolute(configuredDataDir)) {
+      throw new Error('PGLITE_DATA_DIR must be an absolute path to a pre-mounted persistent volume in production.');
+    }
+    if (!fs.existsSync(DATA_DIR) || !fs.statSync(DATA_DIR).isDirectory()) {
+      throw new Error('PGLITE_DATA_DIR must be an existing directory on a persistent volume.');
+    }
+  } else if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
   try {
-    fs.unlinkSync(pidFile);
-  } catch {}
+    pgInstance = new PGlite(DATA_DIR);
+  } catch (err) {
+    console.error('[PostgreSQL] Could not open the configured data directory. Refusing an in-memory fallback.');
+    throw err;
+  }
 }
 
-let pgInstance: PGlite;
-try {
-  pgInstance = new PGlite(DATA_DIR);
-} catch (err) {
-  console.warn('[PostgreSQL] Could not open persistent data dir, initializing in-memory fallback:', err);
-  pgInstance = new PGlite();
+function validateProductionDatabaseInitialization() {
+  if (!isProduction) return;
+  if (!configuredDataDir || !path.isAbsolute(configuredDataDir) ||
+      !fs.existsSync(DATA_DIR) || !fs.statSync(DATA_DIR).isDirectory()) {
+    throw new Error('PGLITE_DATA_DIR must be an absolute path to an existing persistent volume directory in production.');
+  }
+  // The schema state is not known until PGlite is opened. Require explicit
+  // database-write/migration authorization before opening it, so even a fresh
+  // or legacy database cannot be initialized before an operator approves it.
+  if (process.env.ALLOW_SCHEMA_MIGRATIONS !== 'true') {
+    throw new Error('Production database initialization requires ALLOW_SCHEMA_MIGRATIONS=true before opening the database.');
+  }
+  if (fs.readdirSync(DATA_DIR).length === 0 && !hasValidInitialAdminConfiguration()) {
+    throw new Error('A valid initial administrator configuration is required before creating a production database.');
+  }
 }
 
-export const pg = pgInstance;
+function hasValidInitialAdminConfiguration() {
+  const email = process.env.INITIAL_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.INITIAL_ADMIN_PASSWORD;
+  return Boolean(email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && password && password.length >= 16);
+}
 
 export async function initDatabase() {
-  console.log('[PostgreSQL] Initializing tables in persistent storage...');
+  // Validate all non-database production prerequisites before PGlite can open
+  // the configured directory or perform startup/recovery writes.
+  validateProductionDatabaseInitialization();
+  initializePGlite();
 
-  await pg.exec(`
+  // Inspect schema state using catalog reads only. Do not create the migration
+  // ledger until authorization and first-admin requirements have been checked.
+  const migrationTable = await pg.query<{ relation: string | null }>("SELECT to_regclass('public.schema_migrations') AS relation");
+  const migrationLedgerExists = Boolean(migrationTable.rows[0]?.relation);
+  const baseline = migrationLedgerExists
+    ? await pg.query<{ version: string }>("SELECT version FROM schema_migrations WHERE version = '001_initial_schema'")
+    : { rows: [] as Array<{ version: string }> };
+  const baselinePending = baseline.rows.length === 0;
+
+  const adminTable = await pg.query<{ relation: string | null }>("SELECT to_regclass('public.admin_users') AS relation");
+  const adminTableExists = Boolean(adminTable.rows[0]?.relation);
+  const adminCount = adminTableExists
+    ? await pg.query<{ count: number }>('SELECT COUNT(*)::int AS count FROM admin_users')
+    : { rows: [{ count: 0 }] };
+  const hasAdmin = Number(adminCount.rows[0]?.count || 0) > 0;
+  const rotationColumn = adminTableExists
+    ? await pg.query<{ exists: boolean }>("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'admin_users' AND column_name = 'must_change_password') AS exists")
+    : { rows: [{ exists: false }] };
+  const legacyAdmin = adminTableExists && hasAdmin
+    ? rotationColumn.rows[0]?.exists
+      ? await pg.query<{ id: string }>("SELECT id FROM admin_users WHERE id = 'usr_admin_1' AND must_change_password = true")
+      : await pg.query<{ id: string }>("SELECT id FROM admin_users WHERE id = 'usr_admin_1'")
+    : { rows: [] as Array<{ id: string }> };
+  const needsAdminBootstrap = !hasAdmin || legacyAdmin.rows.length > 0;
+
+  if (baselinePending && isProduction && process.env.ALLOW_SCHEMA_MIGRATIONS !== 'true') {
+    throw new Error('Schema version 001 is pending. Verify a backup and authorize migration before startup.');
+  }
+  if (needsAdminBootstrap && !hasValidInitialAdminConfiguration()) {
+    throw new Error('A valid initial administrator configuration is required before database initialization can write.');
+  }
+
+  if (baselinePending) {
+    await pg.exec('BEGIN');
+    try {
+      await pg.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version TEXT PRIMARY KEY,
+      applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- Admin Users
     CREATE TABLE IF NOT EXISTS admin_users (
       id TEXT PRIMARY KEY,
@@ -168,10 +253,25 @@ export async function initDatabase() {
       details JSONB DEFAULT '{}'::jsonb,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
-  `);
+
+    CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions (expires_at);
+    CREATE INDEX IF NOT EXISTS idx_contact_inquiries_created_at ON contact_inquiries (created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_page_views_date_path ON page_views (date_str, path);
+    CREATE INDEX IF NOT EXISTS idx_admin_activity_logs_created_at ON admin_activity_logs (created_at DESC);
+    ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false;
+    UPDATE admin_users SET must_change_password = true WHERE id = 'usr_admin_1';
+    DELETE FROM admin_sessions;
+      `);
+      await pg.query("INSERT INTO schema_migrations (version) VALUES ('001_initial_schema')");
+      await pg.exec('COMMIT');
+    } catch (error) {
+      await pg.exec('ROLLBACK');
+      throw error;
+    }
+  }
 
   await seedInitialData();
-  console.log('[PostgreSQL] Database ready with seed data.');
+  console.log('[PostgreSQL] Database schema is ready.');
 }
 
 async function seedInitialData() {
@@ -179,14 +279,34 @@ async function seedInitialData() {
   const adminRes = await pg.query('SELECT COUNT(*) as count FROM admin_users');
   const count = parseInt((adminRes.rows[0] as any)?.count || '0', 10);
   if (count === 0) {
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash('InfinovaAdmin2026!', salt);
+    const email = process.env.INITIAL_ADMIN_EMAIL?.trim().toLowerCase();
+    const password = process.env.INITIAL_ADMIN_PASSWORD;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password || password.length < 16) {
+      throw new Error('An initial administrator is required. Set INITIAL_ADMIN_EMAIL and an INITIAL_ADMIN_PASSWORD of at least 16 characters, then restart.');
+    }
+    const hash = await bcrypt.hash(password, 12);
     await pg.query(
       `INSERT INTO admin_users (id, email, password_hash, name, role)
        VALUES ($1, $2, $3, $4, $5)`,
-      ['usr_admin_1', 'admin@sdinfinova.com', hash, 'SD Infinova Admin', 'superadmin']
+      [`usr_${crypto.randomUUID()}`, email, hash, 'SD Infinova Admin', 'superadmin']
     );
-    console.log('[PostgreSQL] Seeded initial admin account: admin@sdinfinova.com');
+    console.log('[PostgreSQL] Created the initial administrator from environment configuration. Remove the bootstrap variables after startup.');
+  } else {
+    const legacyAdmin = await pg.query("SELECT id FROM admin_users WHERE id = 'usr_admin_1' AND must_change_password = true");
+    if (legacyAdmin.rows.length > 0) {
+      const email = process.env.INITIAL_ADMIN_EMAIL?.trim().toLowerCase();
+      const password = process.env.INITIAL_ADMIN_PASSWORD;
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password || password.length < 16) {
+        throw new Error('A legacy default administrator must be rotated. Set INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD (at least 16 characters), then restart.');
+      }
+      const hash = await bcrypt.hash(password, 12);
+      await pg.query(
+        `UPDATE admin_users SET email = $1, password_hash = $2, role = 'superadmin', must_change_password = false, updated_at = CURRENT_TIMESTAMP WHERE id = 'usr_admin_1'`,
+        [email, hash]
+      );
+      await pg.query("DELETE FROM admin_sessions WHERE user_id = 'usr_admin_1'");
+      console.log('[PostgreSQL] Rotated the legacy seeded administrator. Remove the bootstrap variables after startup.');
+    }
   }
 
   // 2. Seed Services
@@ -526,6 +646,8 @@ Ensure your service pages naturally integrate regional intent without keyword st
     console.log('[PostgreSQL] Seeded general site settings.');
   }
 
+  // Fictional inquiry and traffic fixtures must never be created in production.
+  if (process.env.NODE_ENV !== 'production' && process.env.SEED_DEMO_DATA === 'true') {
   // 6. Seed sample inquiries for the admin dashboard demonstration
   const inqRes = await pg.query('SELECT COUNT(*) as count FROM contact_inquiries');
   if (parseInt((inqRes.rows[0] as any)?.count || '0', 10) === 0) {
@@ -601,5 +723,6 @@ Ensure your service pages naturally integrate regional intent without keyword st
       );
     }
     console.log('[PostgreSQL] Seeded initial privacy-conscious page view events.');
+  }
   }
 }
