@@ -130,6 +130,15 @@ export default function App() {
 
   const currentWhatsApp = settings?.whatsapp_number || '9779800000000';
   const currentEmail = settings?.contact_email || 'sd.infinova@gmail.com';
+  // Route handling for inquiry success page
+  if (window.location.pathname === '/inquiry-success') {
+    const InquirySuccess = React.lazy(() => import('./components/InquirySuccess'));
+    return (
+      <React.Suspense fallback={<div className="text-center py-20">Loading...</div>}>
+        <InquirySuccess />
+      </React.Suspense>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#090a0c] text-[#f1f2f4] flex flex-col font-sans selection:bg-[#d89f66]/25 selection:text-[#f8caa0]">
