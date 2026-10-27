@@ -29,7 +29,7 @@ export const InquirySuccess: React.FC = () => {
         setResult(JSON.parse(stored) as SubmissionResult);
         // Optionally clear after loading to avoid persisting on refresh
         // sessionStorage.removeItem('inquiryResult');
-      } catch {}
+      } catch { }
     }
   }, []);
 
@@ -89,19 +89,19 @@ export const InquirySuccess: React.FC = () => {
               <h3 className="text-lg font-bold text-white">
                 {result.preferredContact === 'whatsapp'
                   ? 'Inquiry Prepared for WhatsApp Chat!'
-                  : 'Inquiry Dispatched to Email!'}
+                  : 'Inquiry Details Ready for Email'}
               </h3>
               <p className="text-xs text-[#d1d5db]">
                 {result.preferredContact === 'whatsapp'
                   ? 'Your message is ready to send directly to SD Infinova on WhatsApp.'
-                  : `Your message has been sent to ${result.preferredContact === 'email' ? 'email' : ''} and recorded in our system.`}
+                  : 'Your inquiry has been recorded. Open the email draft below to review and send your message.'}
               </p>
             </div>
           </div>
           <p className="text-xs text-[#9ca3af] leading-relaxed pt-2 border-t border-white/[0.08]">
             {result.preferredContact === 'whatsapp'
               ? 'If WhatsApp did not open automatically, click the primary button below to launch the chat with all your project details prefilled.'
-              : 'Click below to review or send the email thread directly from your mail client, or connect on WhatsApp for instant confirmation.'}
+              : 'Click below to open a prefilled email draft and send it from your mail client, or connect on WhatsApp for instant confirmation.'}
           </p>
         </div>
         {/* Primary & Secondary Actions */}
@@ -118,7 +118,7 @@ export const InquirySuccess: React.FC = () => {
               </a>
               <a
                 href={result.mailtoUrl}
-                className="w-full py-3 px-5 rounded-xl bg-[#161922] hover:bg-[#1d212c] text-[#d1d5db] hover:text-white border border-white/[0.08] text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+                target="_blank" rel="noopener noreferrer" className="w-full py-3 px-5 rounded-xl bg-[#161922] hover:bg-[#1d212c] text-[#d1d5db] hover:text-white border border-white/[0.08] text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
               >
                 <Mail className="w-4 h-4 text-[#d89f66]" />
                 Also Send Copy to Email
@@ -128,7 +128,7 @@ export const InquirySuccess: React.FC = () => {
             <>
               <a
                 href={result.mailtoUrl}
-                className="w-full py-4 px-6 rounded-xl bg-[#d89f66] hover:bg-[#eec397] text-[#090a0c] font-bold text-sm flex items-center justify-center gap-3 shadow-xl hover:shadow-[0_0_25px_rgba(216,159,102,0.35)] transition-all"
+                target="_blank" rel="noopener noreferrer" className="w-full py-4 px-6 rounded-xl bg-[#d89f66] hover:bg-[#eec397] text-[#090a0c] font-bold text-sm flex items-center justify-center gap-3 shadow-xl hover:shadow-[0_0_25px_rgba(216,159,102,0.35)] transition-all"
               >
                 <Mail className="w-5 h-5" />
                 Open in Email App (Gmail / Outlook / Apple Mail)
