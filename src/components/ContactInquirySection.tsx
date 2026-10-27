@@ -153,18 +153,18 @@ export const ContactInquirySection: React.FC<ContactInquirySectionProps> = ({
         colors: ['#25D366', '#d89f66', '#ffffff']
       });
 
-      // Automatically dispatch based on preferred contact
-      if (formData.preferred_contact === 'whatsapp') {
-        // Try opening WhatsApp directly
-        try {
-          window.open(whatsappLink, '_blank', 'noopener,noreferrer');
-        } catch { }
-      } else if (formData.preferred_contact === 'email') {
-        // Open email client
-        try {
-          window.open(mailtoLink, '_blank', 'noopener,noreferrer');
-        } catch { }
-      }
+      // Store submission result in sessionStorage for the success page
+      const storedResult = {
+        inquiryId: data.inquiry_id,
+        preferredContact: formData.preferred_contact,
+        whatsappUrl: whatsappLink,
+        mailtoUrl: mailtoLink,
+        summaryText: summary
+      };
+      sessionStorage.setItem('inquiryResult', JSON.stringify(storedResult));
+      // Navigate to the dedicated success route
+      window.location.assign('/inquiry-success');
+      // Do NOT automatically open WhatsApp or Email; user will click the buttons on the success page.
     } catch (err: any) {
       setErrorMessage(err.message || 'Network error submitting inquiry. Please contact us on WhatsApp directly.');
     } finally {
@@ -563,14 +563,14 @@ export const ContactInquirySection: React.FC<ContactInquirySectionProps> = ({
                       <>
                         <span className="w-2 h-2 rounded-full bg-[#25D366] shrink-0" />
                         <span>
-                          <strong>WhatsApp Selected:</strong> Submitting will immediately open WhatsApp with this inquiry directed to our engineering lead.
+                          <strong>WhatsApp Selected:</strong> Submitting will prepare a prefilled WhatsApp message ready for you to open manually.
                         </span>
                       </>
                     ) : (
                       <>
                         <span className="w-2 h-2 rounded-full bg-[#d89f66] shrink-0" />
                         <span>
-                          <strong>Email Selected:</strong> Submitting will send the full project scope directly to <strong>{studioEmail}</strong>.
+                          <strong>Email Selected:</strong> Submitting will prepare an email draft ready for you to send manually.
                         </span>
                       </>
                     )}
